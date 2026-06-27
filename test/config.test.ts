@@ -37,17 +37,13 @@ describe('config/env', () => {
     expect(parseDotEnv('# hi\nA=1\nB="two"\n')).toEqual({ A: '1', B: 'two' });
   });
 
-  it('persists selected models and latency observations', () => {
+  it('persists selected models and model groups', () => {
     const store = new ConfigStore(tempRoot());
     store.updateSelectedModelIds(['a', 'b', 'a']);
     store.updateModelGroup('fast', ['b', 'b']);
-    store.recordSuccess('b', 123, { httpStatus: 200 });
-    store.recordFailure('c', { status: 'rate-limited', httpStatus: 429 });
     const again = new ConfigStore(store.paths.root);
     expect(again.readConfig().selectedModelIds).toEqual(['a', 'b']);
     expect(again.readConfig().modelGroups.fast).toEqual(['b']);
-    expect(again.readLatency().b).toMatchObject({ latencyMs: 123, lastStatus: 'ok', lastHttpStatus: 200 });
-    expect(again.readLatency().c).toMatchObject({ failures: 1, lastStatus: 'rate-limited', lastHttpStatus: 429 });
   });
 
   it('persists model usage counters and token totals', () => {
@@ -75,22 +71,6 @@ describe('config/env', () => {
       selectedModelIds: ['a'],
       modelGroups: { fast: [], balanced: [], capable: [] },
     });
-  });
-
-  it('sets cooldownUntil on rate-limit/quota failures and skips it for transient errors', () => {
-    const store = new ConfigStore(tempRoot());
-    const before = Date.now();
-    store.recordFailure('rl', { status: 'rate-limited', httpStatus: 429 });
-    store.recordFailure('quota', { status: 'quota', httpStatus: 402 });
-    store.recordFailure('http429', { httpStatus: 429 });
-    store.recordFailure('http402', { httpStatus: 402 });
-    store.recordFailure('http500', { status: 'failed', httpStatus: 500 });
-    const all = store.readLatency();
-    for (const id of ['rl', 'quota', 'http429', 'http402']) {
-      const cooldown = Date.parse(all[id]!.cooldownUntil!);
-      expect(cooldown).toBeGreaterThanOrEqual(before + 60_000);
-    }
-    expect(all.http500!.cooldownUntil).toBeUndefined();
   });
 
   it('treats model cache as fresh for 5 minutes', () => {

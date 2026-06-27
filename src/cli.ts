@@ -56,7 +56,6 @@ async function main(): Promise<void> {
     await runModelCommand({
       all: parsed.flags.has('all'),
       json: parsed.flags.has('json'),
-      best: parsed.flags.has('best'),
       noTui: parsed.flags.has('no-tui'),
       group: typeof groupFlag === 'string' ? groupFlag : undefined,
       select: typeof selectFlag === 'string' ? selectFlag.split(',').map((x) => x.trim()).filter(Boolean) : undefined,

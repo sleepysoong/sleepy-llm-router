@@ -9,16 +9,20 @@ const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
 
 describe('status command', () => {
-  it('reports the same best route the request router would use', () => {
+  it('reports primary model from config', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-status-'));
     roots.push(root);
     const store = new ConfigStore(root);
-    store.updateSelectedModelIds(['timed-out:free', 'ready:free']);
-    store.writeLatency({
-      'timed-out:free': { modelId: 'timed-out:free', latencyMs: 100, updatedAt: '', successes: 1, failures: 1, lastStatus: 'timeout' },
-      'ready:free': { modelId: 'ready:free', latencyMs: 200, updatedAt: '', successes: 1, failures: 0, lastStatus: 'ok' },
-    });
+    store.updateSelectedModelIds(['model-a:free', 'model-b:free']);
 
-    expect(getStatus(store).bestModel).toEqual({ id: 'timed-out:free', latencyMs: 100, reason: 'fallback-order' });
+    expect(getStatus(store).primaryModel).toBe('model-a:free');
+  });
+
+  it('reports no primary model when empty', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-status-'));
+    roots.push(root);
+    const store = new ConfigStore(root);
+
+    expect(getStatus(store).primaryModel).toBeUndefined();
   });
 });

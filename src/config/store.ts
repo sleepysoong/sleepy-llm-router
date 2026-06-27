@@ -1,17 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DEFAULT_MODEL_GROUPS, normalizeModelGroups } from '../model-groups.js';
-import { DaemonState, LatencyObservation, ModelCache, ModelGroupName, OmfmConfig, UsageObservation } from '../types.js';
-import { getConfigPath, getConfigRoot, getDaemonPath, getLatencyPath, getModelCachePath, getUsagePath } from './paths.js';
+import { DaemonState, ModelCache, ModelGroupName, OmfmConfig, UsageObservation } from '../types.js';
+import { getConfigPath, getConfigRoot, getDaemonPath, getModelCachePath, getUsagePath } from './paths.js';
 
 const DEFAULT_PORT = 4567;
 export const MODEL_CACHE_TTL_MS = 5 * 60 * 1000;
-export const RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000;
 
 export interface StorePaths {
   root: string;
   configPath: string;
-  latencyPath: string;
   usagePath: string;
   modelCachePath: string;
   daemonPath: string;
@@ -21,7 +19,6 @@ export function createStorePaths(root = getConfigRoot()): StorePaths {
   return {
     root,
     configPath: getConfigPath(root),
-    latencyPath: getLatencyPath(root),
     usagePath: getUsagePath(root),
     modelCachePath: getModelCachePath(root),
     daemonPath: getDaemonPath(root),
@@ -93,48 +90,6 @@ export class ConfigStore {
     };
     this.writeConfig(next);
     return next;
-  }
-
-  readLatency(): Record<string, LatencyObservation> {
-    return readJson<Record<string, LatencyObservation>>(this.paths.latencyPath, {});
-  }
-
-  writeLatency(latency: Record<string, LatencyObservation>): void {
-    writeJson(this.paths.latencyPath, latency);
-  }
-
-  recordSuccess(modelId: string, latencyMs: number, details: { httpStatus?: number } = {}): void {
-    const all = this.readLatency();
-    const current = all[modelId];
-    all[modelId] = {
-      modelId,
-      latencyMs,
-      updatedAt: new Date().toISOString(),
-      successes: (current?.successes ?? 0) + 1,
-      failures: current?.failures ?? 0,
-      lastStatus: 'ok',
-      ...(details.httpStatus !== undefined ? { lastHttpStatus: details.httpStatus } : {}),
-    };
-    this.writeLatency(all);
-  }
-
-  recordFailure(modelId: string, details: { status?: string; httpStatus?: number; error?: string } = {}): void {
-    const all = this.readLatency();
-    const current = all[modelId];
-    const isCooldownTrigger = details.status === 'rate-limited' || details.status === 'quota' || details.httpStatus === 429 || details.httpStatus === 402;
-    const cooldown = isCooldownTrigger ? new Date(Date.now() + RATE_LIMIT_COOLDOWN_MS).toISOString() : current?.cooldownUntil;
-    all[modelId] = {
-      modelId,
-      latencyMs: current?.latencyMs ?? Number.POSITIVE_INFINITY,
-      updatedAt: new Date().toISOString(),
-      successes: current?.successes ?? 0,
-      failures: (current?.failures ?? 0) + 1,
-      ...(details.status ? { lastStatus: details.status } : {}),
-      ...(details.httpStatus !== undefined ? { lastHttpStatus: details.httpStatus } : {}),
-      ...(details.error ? { lastError: details.error } : {}),
-      ...(cooldown ? { cooldownUntil: cooldown } : {}),
-    };
-    this.writeLatency(all);
   }
 
   readUsage(): Record<string, UsageObservation> {

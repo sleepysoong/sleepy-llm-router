@@ -1,11 +1,10 @@
-import { LatencyObservation, OmfmModel } from '../types.js';
+import { OmfmModel } from '../types.js';
 
 export type ModelProbeStatus = 'pending' | 'cached' | 'probing' | 'ok' | 'quota' | 'rate-limited' | 'payment' | 'timeout' | 'aborted' | 'failed' | 'deferred';
 
 export interface ModelDisplayRow {
   model: OmfmModel;
   selected: boolean;
-  latencyMs?: number;
   status: ModelProbeStatus;
   recommendation: RecommendationMark;
   catalogIndex?: number;
@@ -31,8 +30,6 @@ const RED = '\u001b[31m';
 const SELECTED_BG = '\u001b[48;5;236m';
 const RESET = '\u001b[0m';
 
-export const FAILED_MODEL_HIDE_TTL_MS = 5 * 60 * 1000;
-
 export type RecommendationMark = 'strong' | 'good' | 'weak' | 'none' | 'pending';
 
 export function stripAnsi(value: string): string {
@@ -55,49 +52,11 @@ export function formatContextLength(contextLength?: number): string {
   return String(contextLength);
 }
 
-export function formatLatency(latencyMs?: number, options: { color?: boolean } = {}): string {
-  if (typeof latencyMs !== 'number' || !Number.isFinite(latencyMs)) return '—';
-  const label = `${Math.round(latencyMs)}ms`;
-  if (!options.color) return label;
-  if (latencyMs <= 800) return `${GREEN}${label}${RESET}`;
-  if (latencyMs <= 1_500) return `${YELLOW}${label}${RESET}`;
-  return `${RED}${label}${RESET}`;
-}
-
-export function latencyFor(modelId: string, latency: Record<string, LatencyObservation>): number | undefined {
-  const value = latency[modelId]?.latencyMs;
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
-function observedStatus(observation: LatencyObservation | undefined, fallback: ModelProbeStatus): ModelProbeStatus {
-  if (!observation?.lastStatus) return fallback;
-  if (observation.lastStatus === 'ok') {
-    const value = observation.latencyMs;
-    return typeof value === 'number' && Number.isFinite(value) ? 'cached' : fallback;
-  }
-  if (
-    observation.lastStatus === 'rate-limited' ||
-    observation.lastStatus === 'payment' ||
-    observation.lastStatus === 'timeout' ||
-    observation.lastStatus === 'aborted' ||
-    observation.lastStatus === 'failed'
-  ) {
-    return observation.lastStatus;
-  }
-  return fallback;
-}
-
-export function recommendModel(row: { latencyMs?: number; status: ModelProbeStatus; model?: OmfmModel }): RecommendationMark {
+export function recommendModel(row: { status: ModelProbeStatus; model?: OmfmModel }): RecommendationMark {
   if (row.status === 'failed' || row.status === 'timeout' || row.status === 'payment' || row.status === 'quota' || row.status === 'rate-limited' || row.status === 'deferred' || row.status === 'aborted') {
     return 'none';
   }
-  if (typeof row.latencyMs !== 'number' || !Number.isFinite(row.latencyMs)) return 'pending';
-  const contextBonus = (row.model?.contextLength ?? 0) >= 100_000 ? 100 : 0;
-  const adjusted = Math.max(0, row.latencyMs - contextBonus);
-  if (adjusted <= 800) return 'strong';
-  if (adjusted <= 1_500) return 'good';
-  if (adjusted <= 3_000) return 'weak';
-  return 'none';
+  return 'pending';
 }
 
 export function formatRecommendation(mark: RecommendationMark, options: { color?: boolean } = {}): string {
@@ -109,17 +68,13 @@ export function formatRecommendation(mark: RecommendationMark, options: { color?
   return label;
 }
 
-export function buildModelRows(models: OmfmModel[], selectedIds: Set<string>, latency: Record<string, LatencyObservation>, status: ModelProbeStatus = 'pending'): ModelDisplayRow[] {
+export function buildModelRows(models: OmfmModel[], selectedIds: Set<string>, status: ModelProbeStatus = 'pending'): ModelDisplayRow[] {
   return models.map((model, catalogIndex) => {
-    const latencyMs = latencyFor(model.id, latency);
-    const cachedStatus = status === 'pending' && latencyMs !== undefined ? 'cached' : status;
-    const nextStatus = status === 'pending' ? observedStatus(latency[model.id], cachedStatus) : cachedStatus;
     return {
       model,
       selected: selectedIds.has(model.id),
-      latencyMs,
-      status: nextStatus,
-      recommendation: recommendModel({ latencyMs, status: nextStatus, model }),
+      status,
+      recommendation: recommendModel({ status, model }),
       catalogIndex,
     };
   });
@@ -141,6 +96,18 @@ function availabilityRank(status: ModelProbeStatus): number {
   return 0;
 }
 
+function compareModelRows(a: ModelDisplayRow, b: ModelDisplayRow, options: { selectedFirst?: boolean } = {}): number {
+  if (options.selectedFirst && a.selected !== b.selected) return a.selected ? -1 : 1;
+  return availabilityRank(a.status) - availabilityRank(b.status)
+    || RECOMMENDATION_ORDER[a.recommendation] - RECOMMENDATION_ORDER[b.recommendation]
+    || compareOptionalNumber(a.model.popularityRank, b.model.popularityRank)
+    || compareOptionalNumber(a.catalogIndex, b.catalogIndex)
+    || (a.model.source ?? 'openrouter').localeCompare(b.model.source ?? 'openrouter')
+    || a.model.provider.localeCompare(b.model.provider)
+    || a.model.name.localeCompare(b.model.name)
+    || a.model.id.localeCompare(b.model.id);
+}
+
 function compareOptionalNumber(a: number | undefined, b: number | undefined): number {
   const aFinite = typeof a === 'number' && Number.isFinite(a);
   const bFinite = typeof b === 'number' && Number.isFinite(b);
@@ -150,37 +117,12 @@ function compareOptionalNumber(a: number | undefined, b: number | undefined): nu
   return 0;
 }
 
-function compareModelRows(a: ModelDisplayRow, b: ModelDisplayRow, options: { selectedFirst?: boolean } = {}): number {
-  if (options.selectedFirst && a.selected !== b.selected) return a.selected ? -1 : 1;
-  return availabilityRank(a.status) - availabilityRank(b.status)
-    || RECOMMENDATION_ORDER[a.recommendation] - RECOMMENDATION_ORDER[b.recommendation]
-    || compareOptionalNumber(a.latencyMs, b.latencyMs)
-    || compareOptionalNumber(a.model.popularityRank, b.model.popularityRank)
-    || compareOptionalNumber(a.catalogIndex, b.catalogIndex)
-    || (a.model.source ?? 'openrouter').localeCompare(b.model.source ?? 'openrouter')
-    || a.model.provider.localeCompare(b.model.provider)
-    || a.model.name.localeCompare(b.model.name)
-    || a.model.id.localeCompare(b.model.id);
-}
-
 export function sortModelRows(rows: ModelDisplayRow[], options: { selectedFirst?: boolean } = {}): ModelDisplayRow[] {
   return [...rows].sort((a, b) => compareModelRows(a, b, options));
 }
 
-function isRecentFailedObservation(observation: LatencyObservation | undefined, now: number, ttlMs: number): boolean {
-  if (observation?.lastStatus !== 'failed') return false;
-  const updatedAt = Date.parse(observation.updatedAt);
-  return Number.isFinite(updatedAt) && now - updatedAt < ttlMs;
-}
-
-export function filterListableModelRows(
-  rows: ModelDisplayRow[],
-  latency: Record<string, LatencyObservation> = {},
-  options: { now?: () => number; failedHideTtlMs?: number } = {},
-): ModelDisplayRow[] {
-  const now = options.now?.() ?? Date.now();
-  const failedHideTtlMs = options.failedHideTtlMs ?? FAILED_MODEL_HIDE_TTL_MS;
-  return rows.filter((row) => !isRecentFailedObservation(latency[row.model.id], now, failedHideTtlMs));
+export function filterListableModelRows(rows: ModelDisplayRow[]): ModelDisplayRow[] {
+  return rows;
 }
 
 function pad(value: string, width: number): string {
@@ -254,8 +196,8 @@ export function renderStaticModelTable(rows: ModelDisplayRow[], options: ModelTa
   const numberWidth = withRowNumbers ? Math.max(2, String(Math.max(measureRows.length, rows.length)).length + 1) : 0;
   const numberPrefix = withRowNumbers ? `${pad('#', numberWidth)} ` : '';
   const header = interactive
-    ? `${pad('Cur', 3)} ${pad('Sel', 3)} ${pad('Source', sourceWidth)} ${pad('Provider', providerWidth)} ${pad('Model', modelWidth)} ${pad('Ctx', 6)} ${pad('Lat', 7)} ${pad('Recommend', 9)} Status`
-    : `${numberPrefix}${pad('Sel', 3)} ${pad('Source', sourceWidth)} ${pad('Provider', providerWidth)} ${pad('Model', modelWidth)} ${pad('Ctx', 6)} ${pad('Lat', 7)} ${pad('Recommend', 9)} Status`;
+    ? `${pad('Cur', 3)} ${pad('Sel', 3)} ${pad('Source', sourceWidth)} ${pad('Provider', providerWidth)} ${pad('Model', modelWidth)} ${pad('Ctx', 6)} ${pad('Recommend', 9)} Status`
+    : `${numberPrefix}${pad('Sel', 3)} ${pad('Source', sourceWidth)} ${pad('Provider', providerWidth)} ${pad('Model', modelWidth)} ${pad('Ctx', 6)} ${pad('Recommend', 9)} Status`;
   const lines = [maybeConstrainLine(header, options.maxWidth)];
   for (const [index, row] of rows.entries()) {
     const active = options.activeIndex === index;
@@ -271,7 +213,6 @@ export function renderStaticModelTable(rows: ModelDisplayRow[], options: ModelTa
       pad(provider, providerWidth),
       pad(truncate(modelLabel, modelWidth), modelWidth),
       pad(formatContextLength(row.model.contextLength), 6),
-      padTrustedAnsi(formatLatency(row.latencyMs, { color: options.colorLatency }), 7),
       padTrustedAnsi(formatRecommendation(row.recommendation, { color: options.colorRecommendation }), 9),
       statusLabel(row.status),
     ];
@@ -283,8 +224,8 @@ export function renderStaticModelTable(rows: ModelDisplayRow[], options: ModelTa
   const minBodyRows = Math.max(0, Math.floor(options.minBodyRows ?? 0));
   const emptyBodyLine = maybeConstrainLine(
     interactive
-      ? `${pad('', 3)} ${pad('', 3)} ${pad('', sourceWidth)} ${pad('', providerWidth)} ${pad('', modelWidth)} ${pad('', 6)} ${pad('', 7)} ${pad('', 9)}`
-      : `${emptyNumberPrefix}${pad('', 3)} ${pad('', sourceWidth)} ${pad('', providerWidth)} ${pad('', modelWidth)} ${pad('', 6)} ${pad('', 7)} ${pad('', 9)}`,
+      ? `${pad('', 3)} ${pad('', 3)} ${pad('', sourceWidth)} ${pad('', providerWidth)} ${pad('', modelWidth)} ${pad('', 6)} ${pad('', 9)}`
+      : `${emptyNumberPrefix}${pad('', 3)} ${pad('', sourceWidth)} ${pad('', providerWidth)} ${pad('', modelWidth)} ${pad('', 6)} ${pad('', 9)}`,
     options.maxWidth,
   );
   while (lines.length - 1 < minBodyRows) lines.push(emptyBodyLine);

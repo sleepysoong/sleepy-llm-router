@@ -43,11 +43,9 @@ describe('model TUI', () => {
       apiKeys: { openrouter: 'k' },
       stdin: input as any,
       stdout: output as any,
-      runScheduler: async () => new Promise(() => undefined),
     });
     expect(output.text()).toContain('Provider');
     expect(output.text()).toContain('Ctx');
-    expect(output.text()).toContain('Lat');
     expect(output.text()).toContain('Status');
     expect(output.text()).toContain('▶ current');
     expect(output.text()).toContain('● in active tab');
@@ -82,7 +80,6 @@ describe('model TUI', () => {
       apiKeys: { openrouter: 'k' },
       stdin: input as any,
       stdout: output as any,
-      runScheduler: async () => new Promise(() => undefined),
     });
 
     input.send('\t');
@@ -98,11 +95,10 @@ describe('model TUI', () => {
     });
   });
 
-  it('toggles, moves, saves, aborts scheduler, and restores terminal', async () => {
+  it('toggles, moves, saves, and restores terminal', async () => {
     const input = new FakeInput();
     const output = new FakeOutput();
     const store = tempStore();
-    let aborted = false;
     const promise = runModelTui({
       models: sampleModels,
       selectedModelIds: ['alpha/one:free'],
@@ -110,10 +106,6 @@ describe('model TUI', () => {
       apiKeys: { openrouter: 'k' },
       stdin: input as any,
       stdout: output as any,
-      runScheduler: async ({ signal }) => {
-        signal?.addEventListener('abort', () => { aborted = true; });
-        return new Promise(() => undefined);
-      },
     });
     input.send('j');
     input.send(' ');
@@ -121,120 +113,12 @@ describe('model TUI', () => {
     const result = await promise;
     expect(result.saved).toBe(true);
     expect(result.selectedModelIds).toEqual(['alpha/one:free', 'beta/two:free']);
-    expect(aborted).toBe(true);
     expect(input.rawModes).toEqual([true, false]);
     expect(input.paused).toBe(true);
     expect(output.text()).toContain('\u001b[?1000l');
     expect(output.text()).toContain('\u001b[?1006l');
     expect(output.text()).toContain('\u001b[?25h');
     expect(output.text()).toContain('\u001b[?1049l');
-  });
-
-  it('saves selected models in displayed recommendation order', async () => {
-    const input = new FakeInput();
-    const output = new FakeOutput();
-    const store = tempStore();
-    store.recordSuccess('beta/two:free', 20);
-    store.recordSuccess('alpha/one:free', 200);
-
-    const promise = runModelTui({
-      models: sampleModels,
-      selectedModelIds: ['alpha/one:free', 'beta/two:free'],
-      store,
-      apiKey: 'k',
-      stdin: input as any,
-      stdout: output as any,
-      runScheduler: async () => new Promise(() => undefined),
-    });
-
-    input.send('\r');
-    await expect(promise).resolves.toMatchObject({ saved: true, selectedModelIds: ['beta/two:free', 'alpha/one:free'] });
-  });
-
-  it('can render multiple rows as probing from a parallel scheduler batch', async () => {
-    const input = new FakeInput();
-    const output = new FakeOutput();
-    const store = tempStore();
-    const promise = runModelTui({
-      models: sampleModels,
-      selectedModelIds: [],
-      store,
-      apiKeys: { openrouter: 'k' },
-      stdin: input as any,
-      stdout: output as any,
-      fetchImpl: (async () => new Promise(() => undefined)) as any,
-      runScheduler: async ({ models, probe, signal }) => {
-        void probe(models[0]!, signal);
-        void probe(models[1]!, signal);
-        return new Promise(() => undefined);
-      },
-    });
-    await new Promise((resolve) => setImmediate(resolve));
-    expect(output.text().match(/probing/g)?.length).toBeGreaterThanOrEqual(2);
-    input.send('q');
-    await promise;
-  });
-
-  it('removes a row when probing marks the model failed', async () => {
-    const input = new FakeInput();
-    const output = new FakeOutput();
-    const store = tempStore();
-    const promise = runModelTui({
-      models: sampleModels,
-      selectedModelIds: ['alpha/one:free'],
-      modelGroups: { fast: ['alpha/one:free'], balanced: [], capable: [] },
-      store,
-      apiKeys: { openrouter: 'k' },
-      stdin: input as any,
-      stdout: output as any,
-      runScheduler: async ({ onUpdate }) => {
-        onUpdate?.({
-          modelId: 'alpha/one:free',
-          result: { modelId: 'alpha/one:free', status: 'failed' },
-        });
-        return 'completed';
-      },
-    });
-    await new Promise((resolve) => setImmediate(resolve));
-    const frame = latestFrame(output.text());
-    expect(frame).not.toContain('alpha/one:free');
-    expect(frame).not.toContain('failed');
-    expect(frame).toContain('All 0');
-    input.send('\r');
-    await expect(promise).resolves.toMatchObject({ saved: true, selectedModelIds: [], modelGroups: { fast: [], balanced: [], capable: [] } });
-  });
-
-  it('keeps row-level rate limits non-terminal while later rows update', async () => {
-    const input = new FakeInput();
-    const output = new FakeOutput();
-    const store = tempStore();
-    const promise = runModelTui({
-      models: sampleModels,
-      selectedModelIds: [],
-      store,
-      apiKeys: { openrouter: 'k' },
-      stdin: input as any,
-      stdout: output as any,
-      runScheduler: async ({ onUpdate }) => {
-        onUpdate?.({
-          modelId: 'alpha/one:free',
-          result: { modelId: 'alpha/one:free', status: 'rate-limited' },
-        });
-        onUpdate?.({
-          modelId: 'beta/two:free',
-          result: { modelId: 'beta/two:free', status: 'ok', latencyMs: 22 },
-        });
-        return 'completed';
-      },
-    });
-    await new Promise((resolve) => setImmediate(resolve));
-    const text = output.text();
-    expect(text).toContain('rate-limit');
-    expect(text).toContain('22ms');
-    expect(text).toContain('\u001b[32m22ms\u001b[0m');
-    expect(text).not.toContain('quota/payment limit reached');
-    input.send('q');
-    await promise;
   });
 
   it('keeps long model lists inside a terminal-sized scrolling viewport', async () => {
@@ -257,7 +141,6 @@ describe('model TUI', () => {
       apiKeys: { openrouter: 'k' },
       stdin: input as any,
       stdout: output as any,
-      runScheduler: async () => new Promise(() => undefined),
     });
 
     let frame = latestFrame(output.text());
@@ -265,7 +148,6 @@ describe('model TUI', () => {
     expect(frame).toContain('Model 01');
     expect(frame).not.toContain('Model 20');
     expect(frame.split('\n').length - 1).toBeLessThanOrEqual(output.rows);
-    const firstHeader = frame.split('\n').find((line) => line.includes('Cur Sel'));
 
     input.send('\u001b[6~');
     frame = latestFrame(output.text());
@@ -273,7 +155,6 @@ describe('model TUI', () => {
     expect(frame).toContain('Model 05');
     expect(frame).not.toContain('Model 01');
     expect(frame.split('\n').length - 1).toBeLessThanOrEqual(output.rows);
-    expect(frame.split('\n').find((line) => line.includes('Cur Sel'))).toBe(firstHeader);
 
     input.send('q');
     await promise;
@@ -298,7 +179,6 @@ describe('model TUI', () => {
       apiKeys: { openrouter: 'k' },
       stdin: input as any,
       stdout: output as any,
-      runScheduler: async () => new Promise(() => undefined),
     });
 
     input.send('\u001b[<65;10;5M');
@@ -339,7 +219,6 @@ describe('model TUI', () => {
       apiKeys: { openrouter: 'k' },
       stdin: input as any,
       stdout: output as any,
-      runScheduler: async () => new Promise(() => undefined),
     });
 
     input.send('\u001b[<65;10;5M');
@@ -354,13 +233,13 @@ describe('model TUI', () => {
   it('cancels without saving on q and exits interrupted on Ctrl+C', async () => {
     const store = tempStore();
     const input = new FakeInput();
-    const cancelPromise = runModelTui({ models: sampleModels, selectedModelIds: ['alpha/one:free'], store, apiKeys: { openrouter: 'k' }, stdin: input as any, stdout: new FakeOutput() as any, runScheduler: async () => new Promise(() => undefined) });
+    const cancelPromise = runModelTui({ models: sampleModels, selectedModelIds: ['alpha/one:free'], store, apiKeys: { openrouter: 'k' }, stdin: input as any, stdout: new FakeOutput() as any });
     input.send(' ');
     input.send('q');
     await expect(cancelPromise).resolves.toMatchObject({ saved: false, selectedModelIds: ['alpha/one:free'], interrupted: false });
 
     const input2 = new FakeInput();
-    const interruptPromise = runModelTui({ models: sampleModels, selectedModelIds: [], store, apiKeys: { openrouter: 'k' }, stdin: input2 as any, stdout: new FakeOutput() as any, runScheduler: async () => new Promise(() => undefined) });
+    const interruptPromise = runModelTui({ models: sampleModels, selectedModelIds: [], store, apiKeys: { openrouter: 'k' }, stdin: input2 as any, stdout: new FakeOutput() as any });
     input2.send('\u0003');
     await expect(interruptPromise).resolves.toMatchObject({ saved: false, interrupted: true });
   });

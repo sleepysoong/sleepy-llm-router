@@ -45,12 +45,10 @@ describe('model command integration', () => {
     expect(out.text()).not.toContain('\u001b');
   });
 
-  it('--all stores the recommendation display order', async () => {
+  it('--all stores all models in config order', async () => {
     const store = tempStore();
-    store.recordSuccess('beta/b:free', 20);
-    store.recordSuccess('alpha/a:free', 200);
     await runModelCommand({ all: true, store, fetchImpl: okFetch(), env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv, stdout: output(false).stream });
-    expect(store.readConfig().selectedModelIds).toEqual(['beta/b:free', 'alpha/a:free']);
+    expect(store.readConfig().selectedModelIds).toEqual(['alpha/a:free', 'beta/b:free']);
   });
 
   it('filters fresh cached models to currently configured providers', async () => {
@@ -97,37 +95,6 @@ describe('model command integration', () => {
     expect(store.readConfig().selectedModelIds).toEqual(['beta/b:free']);
   });
 
-  it('omits cached failed models from JSON, static output, and --all selection', async () => {
-    const store = tempStore();
-    store.recordFailure('alpha/a:free', { status: 'failed', httpStatus: 404 });
-    const jsonOut = output(false);
-    await runModelCommand({ json: true, store, fetchImpl: okFetch(), env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv, stdout: jsonOut.stream });
-    expect((JSON.parse(jsonOut.text()) as any).models.map((model: any) => model.id)).toEqual(['beta/b:free']);
-
-    const allOut = output(false);
-    await runModelCommand({ all: true, store, fetchImpl: okFetch(), env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv, stdout: allOut.stream });
-    expect(store.readConfig().selectedModelIds).toEqual(['beta/b:free']);
-    expect(allOut.text()).not.toContain('alpha/a:free');
-    expect(allOut.text()).toContain('Beta');
-  });
-
-  it('keeps older failed models eligible for reprobe and selection', async () => {
-    const store = tempStore();
-    store.writeLatency({
-      'alpha/a:free': {
-        modelId: 'alpha/a:free',
-        latencyMs: Number.POSITIVE_INFINITY,
-        updatedAt: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
-        successes: 0,
-        failures: 1,
-        lastStatus: 'failed',
-      },
-    });
-    const out = output(false);
-    await runModelCommand({ json: true, store, fetchImpl: okFetch(), env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv, stdout: out.stream });
-    expect((JSON.parse(out.text()) as any).models.map((model: any) => model.id)).toEqual(['alpha/a:free', 'beta/b:free']);
-  });
-
   it('--all selects all and non-TTY static output does not open TUI', async () => {
     const store = tempStore();
     const out = output(false);
@@ -137,80 +104,6 @@ describe('model command integration', () => {
     expect(out.text()).toContain('Provider');
     expect(out.text()).not.toContain('\u001b');
     expect(runTui).not.toHaveBeenCalled();
-  });
-
-  it('--best prints the fastest freshly probed selected model', async () => {
-    const store = tempStore();
-    store.updateSelectedModelIds(['alpha/a:free', 'beta/b:free']);
-    const out = output(false);
-    await runModelCommand({
-      best: true,
-      store,
-      fetchImpl: okFetch(),
-      env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv,
-      stdout: out.stream,
-      runScheduler: async (options) => {
-        for (const model of options.models) {
-          const latencyMs = model.id === 'beta/b:free' ? 20 : 50;
-          const result = { modelId: model.id, status: 'ok' as const, latencyMs, httpStatus: 200 };
-          options.store?.recordSuccess(model.id, latencyMs, { httpStatus: 200 });
-          options.onUpdate?.({ modelId: model.id, result });
-        }
-        return 'completed';
-      },
-    });
-    expect(out.text()).toBe('beta/b:free\n');
-    expect(store.readLatency()['beta/b:free']).toMatchObject({ latencyMs: 20, lastStatus: 'ok' });
-  });
-
-  it('--best --group probes only configured group candidates', async () => {
-    const store = tempStore();
-    store.updateSelectedModelIds(['alpha/a:free', 'beta/b:free']);
-    store.updateModelGroup('fast', ['alpha/a:free']);
-    const out = output(false);
-    const probed: string[] = [];
-    await runModelCommand({
-      best: true,
-      group: 'haiku',
-      store,
-      fetchImpl: okFetch(),
-      env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv,
-      stdout: out.stream,
-      runScheduler: async (options) => {
-        for (const model of options.models) {
-          probed.push(model.id);
-          const result = { modelId: model.id, status: 'ok' as const, latencyMs: 10, httpStatus: 200 };
-          options.onUpdate?.({ modelId: model.id, result });
-        }
-        return 'completed';
-      },
-    });
-    expect(probed).toEqual(['alpha/a:free']);
-    expect(out.text()).toBe('alpha/a:free\n');
-  });
-
-  it('--best --json falls back to cached latency when fresh probes do not succeed', async () => {
-    const store = tempStore();
-    store.recordSuccess('alpha/a:free', 11);
-    const out = output(false);
-    await runModelCommand({
-      best: true,
-      json: true,
-      store,
-      fetchImpl: okFetch(),
-      env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv,
-      stdout: out.stream,
-      runScheduler: async (options) => {
-        for (const model of options.models) {
-          const result = { modelId: model.id, status: 'rate-limited' as const, httpStatus: 429 };
-          options.store?.recordFailure?.(model.id, { status: result.status, httpStatus: result.httpStatus });
-          options.onUpdate?.({ modelId: model.id, result });
-        }
-        return 'completed';
-      },
-    });
-    const body = JSON.parse(out.text()) as any;
-    expect(body).toMatchObject({ bestModelId: 'alpha/a:free', latencyMs: 11, status: 'cached', probed: false });
   });
 
   it('can list NVIDIA models without requiring OpenRouter', async () => {
@@ -245,7 +138,7 @@ describe('model command integration', () => {
     expect(promptLine).not.toHaveBeenCalled();
     expect(out.text()).toContain('Free models:');
     expect(out.text()).toContain('Alpha');
-    expect(out.text()).not.toContain('[?1049h');
+    expect(out.text()).not.toContain('[?1049h');
     expect(store.readConfig().selectedModelIds).toEqual(['alpha/a:free']);
   });
 
@@ -376,7 +269,7 @@ describe('model command integration', () => {
     const runTui = vi.fn(async (options) => {
       expect(options.selectedModelIds).toEqual(['alpha/a:free']);
       expect(options.initialTab).toBe('all');
-      return { saved: true, interrupted: false, selectedModelIds: ['beta/b:free'], modelGroups: { fast: [], balanced: [], capable: [] }, terminalState: 'aborted' };
+      return { saved: true, interrupted: false, selectedModelIds: ['beta/b:free'], modelGroups: { fast: [], balanced: [], capable: [] } };
     });
     await runModelCommand({ store, fetchImpl: okFetch(), env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv, stdout: output(true).stream, runTui });
     expect(store.readConfig().selectedModelIds).toEqual(['beta/b:free']);
@@ -390,7 +283,7 @@ describe('model command integration', () => {
       expect(options.selectedModelIds).toEqual(['alpha/a:free']);
       expect(options.modelGroups.balanced).toEqual(['alpha/a:free']);
       expect(options.initialTab).toBe('balanced');
-      return { saved: true, interrupted: false, selectedModelIds: ['alpha/a:free', 'beta/b:free'], modelGroups: { fast: [], balanced: ['beta/b:free'], capable: [] }, terminalState: 'aborted' };
+      return { saved: true, interrupted: false, selectedModelIds: ['alpha/a:free', 'beta/b:free'], modelGroups: { fast: [], balanced: ['beta/b:free'], capable: [] } };
     });
     await runModelCommand({ group: 'sonnet', store, fetchImpl: okFetch(), env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv, stdout: output(true).stream, runTui });
     expect(store.readConfig().modelGroups.balanced).toEqual(['beta/b:free']);

@@ -1,48 +1,20 @@
 import { selectedGroupModelIds } from '../model-groups.js';
-import { LatencyObservation, ModelGroups } from '../types.js';
+import { ModelGroups } from '../types.js';
 
 const GENERIC_MODELS = new Set(['', 'auto', 'default', 'omfm', 'openrouter/free']);
 
 export interface RouteChoice {
   modelId: string;
-  reason: 'requested-selected' | 'model-group' | 'lowest-latency' | 'fallback-order';
+  reason: 'requested-selected' | 'model-group' | 'fallback-order';
 }
 
-function latencyValue(obs: LatencyObservation | undefined): number | undefined {
-  if (!obs) return undefined;
-  if (!Number.isFinite(obs.latencyMs)) return undefined;
-  return obs.latencyMs;
-}
-
-export function isCoolingDown(obs: LatencyObservation | undefined): boolean {
-  if (!obs?.cooldownUntil) return false;
-  const until = Date.parse(obs.cooldownUntil);
-  return Number.isFinite(until) && until > Date.now();
-}
-
-function statusRank(obs: LatencyObservation | undefined): number {
-  if (isCoolingDown(obs)) return 2;
-  if (obs?.lastStatus && obs.lastStatus !== 'ok' && !obs.cooldownUntil) return 1;
-  return 0;
-}
-
-function pickLowestLatency(ids: string[], observations: Record<string, LatencyObservation>): string | undefined {
-  const withLatency = ids
-    .map((modelId, index) => ({ modelId, index, latency: latencyValue(observations[modelId]), rank: statusRank(observations[modelId]) }))
-    .filter((item): item is { modelId: string; index: number; latency: number; rank: number } => item.latency !== undefined)
-    .sort((a, b) => a.rank - b.rank || a.latency - b.latency || a.index - b.index || a.modelId.localeCompare(b.modelId));
-  return withLatency[0]?.modelId;
-}
-
-export function chooseModel(selectedModelIds: string[], observations: Record<string, LatencyObservation>, requestedModel?: string): RouteChoice {
+export function chooseModel(selectedModelIds: string[], requestedModel?: string): RouteChoice {
   if (selectedModelIds.length === 0) {
-    throw new Error('No models selected. Run `omfm model` to choose at least one OpenRouter free model.');
+    throw new Error('No models selected. Run `omfm model` to choose at least one model.');
   }
-
   if (requestedModel && !GENERIC_MODELS.has(requestedModel) && selectedModelIds.includes(requestedModel)) {
     return { modelId: requestedModel, reason: 'requested-selected' };
   }
-
   return { modelId: selectedModelIds[0]!, reason: 'fallback-order' };
 }
 
@@ -54,23 +26,18 @@ function candidatePool(selectedModelIds: string[], requestedModel?: string, mode
   return ids ? { ids, grouped: true } : { ids: selectedModelIds, grouped: false };
 }
 
-export function chooseGroupedModel(selectedModelIds: string[], observations: Record<string, LatencyObservation>, requestedModel?: string, modelGroups?: ModelGroups): RouteChoice {
+export function chooseGroupedModel(selectedModelIds: string[], requestedModel?: string, modelGroups?: ModelGroups): RouteChoice {
   if (requestedModel && !GENERIC_MODELS.has(requestedModel) && selectedModelIds.includes(requestedModel)) {
     return { modelId: requestedModel, reason: 'requested-selected' };
   }
   const pool = candidatePool(selectedModelIds, requestedModel, modelGroups);
-  const choice = chooseModel(pool.ids, observations, requestedModel);
+  const choice = chooseModel(pool.ids, requestedModel);
   return pool.grouped && choice.reason !== 'requested-selected' ? { ...choice, reason: 'model-group' } : choice;
 }
 
-export function orderedCandidates(selectedModelIds: string[], observations: Record<string, LatencyObservation>, requestedModel?: string, modelGroups?: ModelGroups): string[] {
+export function orderedCandidates(selectedModelIds: string[], requestedModel?: string, modelGroups?: ModelGroups): string[] {
   const pool = candidatePool(selectedModelIds, requestedModel, modelGroups);
-  const first = chooseGroupedModel(selectedModelIds, observations, requestedModel, modelGroups).modelId;
-  const rest = pool.ids.filter((id) => id !== first).sort((a, b) => {
-    const ra = statusRank(observations[a]);
-    const rb = statusRank(observations[b]);
-    if (ra !== rb) return ra - rb;
-    return pool.ids.indexOf(a) - pool.ids.indexOf(b);
-  });
+  const first = chooseGroupedModel(selectedModelIds, requestedModel, modelGroups).modelId;
+  const rest = pool.ids.filter((id) => id !== first);
   return [first, ...rest];
 }

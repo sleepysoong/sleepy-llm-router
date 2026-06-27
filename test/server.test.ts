@@ -11,14 +11,12 @@ function tempStore() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-server-'));
   roots.push(root);
   const store = new ConfigStore(root);
-  store.updateSelectedModelIds(['slow:free', 'fast:free']);
+  store.updateSelectedModelIds(['model-a:free', 'model-b:free']);
   const models: OmfmModel[] = [
-    { id: 'slow:free', name: 'Slow', provider: 'test' },
-    { id: 'fast:free', name: 'Fast', provider: 'test' },
+    { id: 'model-a:free', name: 'Model A', provider: 'test' },
+    { id: 'model-b:free', name: 'Model B', provider: 'test' },
   ];
   store.writeModelCache({ models, fetchedAt: new Date().toISOString() });
-  store.recordSuccess('slow:free', 500);
-  store.recordSuccess('fast:free', 10);
   return store;
 }
 
@@ -40,7 +38,7 @@ describe('local proxy server', () => {
     await withServer(store, (async () => new Response('{}')) as FetchLike, async (base) => {
       const res = await fetch(`${base}/v1/models`);
       const body = await res.json() as any;
-      expect(body.data.map((m: any) => m.id)).toEqual(['slow:free', 'fast:free']);
+      expect(body.data.map((m: any) => m.id)).toEqual(['model-a:free', 'model-b:free']);
     });
   });
 
@@ -65,7 +63,7 @@ describe('local proxy server', () => {
     });
   });
 
-  it('routes OpenAI chat to lowest latency selected model', async () => {
+  it('routes OpenAI chat to first selected model', async () => {
     const store = tempStore();
     const seen: any[] = [];
     const mockFetch: FetchLike = async (_url, init) => {
@@ -75,9 +73,9 @@ describe('local proxy server', () => {
     await withServer(store, mockFetch, async (base) => {
       const res = await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] }) });
       const body = await res.json() as any;
-      expect(body.model).toBe('slow:free');
-      expect(seen[0].model).toBe('slow:free');
-      expect(store.readUsage()['slow:free']).toMatchObject({ requests: 1, successes: 1, inputTokens: 2, outputTokens: 3, totalTokens: 5 });
+      expect(body.model).toBe('model-a:free');
+      expect(seen[0].model).toBe('model-a:free');
+      expect(store.readUsage()['model-a:free']).toMatchObject({ requests: 1, successes: 1, inputTokens: 2, outputTokens: 3, totalTokens: 5 });
     });
   });
 
@@ -100,8 +98,8 @@ describe('local proxy server', () => {
       await res.text();
       const responseLog = logs.find((event) => event.type === 'response');
       expect(logs[0]).toMatchObject({ type: 'request', method: 'POST', path: '/v1/chat/completions' });
-      expect(responseLog).toMatchObject({ type: 'response', statusCode: 200, requestedModel: 'auto', modelId: 'slow:free', routeReason: 'fallback-order', observedLatencyMs: 500 });
-      expect(formatServerLogEvent(responseLog!)).toContain('requested=auto model=slow:free route=fallback-order cached=500ms');
+      expect(responseLog).toMatchObject({ type: 'response', statusCode: 200, requestedModel: 'auto', modelId: 'model-a:free', routeReason: 'fallback-order' });
+      expect(formatServerLogEvent(responseLog!)).toContain('requested=auto model=model-a:free route=fallback-order');
       expect(formatServerLogEvent(logs[0]!, { color: true })).toContain('\u001b[36mrequest\u001b[0m');
       expect(formatServerLogEvent(responseLog!, { color: true })).toContain('\u001b[32mresponse\u001b[0m');
     } finally {
@@ -111,8 +109,8 @@ describe('local proxy server', () => {
 
   it('routes model-group aliases within that group', async () => {
     const store = tempStore();
-    store.updateModelGroup('fast', ['slow:free']);
-    store.updateModelGroup('capable', ['fast:free']);
+    store.updateModelGroup('fast', ['model-a:free']);
+    store.updateModelGroup('capable', ['model-b:free']);
     const seen: any[] = [];
     const mockFetch: FetchLike = async (_url, init) => {
       seen.push(JSON.parse(String(init?.body)));
@@ -121,14 +119,14 @@ describe('local proxy server', () => {
     await withServer(store, mockFetch, async (base) => {
       const res = await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'omfm/fast', messages: [{ role: 'user', content: 'hi' }] }) });
       const body = await res.json() as any;
-      expect(body.model).toBe('slow:free');
-      expect(seen[0].model).toBe('slow:free');
+      expect(body.model).toBe('model-a:free');
+      expect(seen[0].model).toBe('model-a:free');
     });
   });
 
   it('accepts Claude-style group aliases on Anthropic requests', async () => {
     const store = tempStore();
-    store.updateModelGroup('capable', ['slow:free']);
+    store.updateModelGroup('capable', ['model-a:free']);
     const seen: any[] = [];
     const mockFetch: FetchLike = async (url, init) => {
       seen.push({ url: String(url), body: JSON.parse(String(init?.body)) });
@@ -137,9 +135,9 @@ describe('local proxy server', () => {
     await withServer(store, mockFetch, async (base) => {
       const res = await fetch(`${base}/anthropic/v1/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'x-api-key': 'local' }, body: JSON.stringify({ model: 'opus', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] }) });
       const body = await res.json() as any;
-      expect(body.model).toBe('slow:free');
-      expect(seen[0].body.model).toBe('slow:free');
-      expect(store.readUsage()['slow:free']).toMatchObject({ requests: 1, successes: 1, inputTokens: 1, outputTokens: 1, totalTokens: 2 });
+      expect(body.model).toBe('model-a:free');
+      expect(seen[0].body.model).toBe('model-a:free');
+      expect(store.readUsage()['model-a:free']).toMatchObject({ requests: 1, successes: 1, inputTokens: 1, outputTokens: 1, totalTokens: 2 });
     });
   });
 
@@ -204,16 +202,14 @@ describe('local proxy server', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-nvidia-upstream-request-'));
     roots.push(root);
     const store = new ConfigStore(root);
-    store.updateSelectedModelIds(['nvidia/deepseek-ai/deepseek-v3.2', 'fast:free']);
+    store.updateSelectedModelIds(['nvidia/deepseek-ai/deepseek-v3.2', 'model-b:free']);
     store.writeModelCache({
       models: [
         { id: 'nvidia/deepseek-ai/deepseek-v3.2', upstreamId: 'deepseek-ai/deepseek-v3.2', name: 'DeepSeek', provider: 'nvidia', source: 'nvidia' },
-        { id: 'fast:free', name: 'Fast', provider: 'test', source: 'openrouter', raw: { id: 'fast:free', pricing: { prompt: '0', completion: '0' } } },
+        { id: 'model-b:free', name: 'Model B', provider: 'test', source: 'openrouter', raw: { id: 'model-b:free', pricing: { prompt: '0', completion: '0' } } },
       ],
       fetchedAt: new Date().toISOString(),
     });
-    store.recordSuccess('fast:free', 1);
-    store.recordSuccess('nvidia/deepseek-ai/deepseek-v3.2', 100);
     const seen: any[] = [];
     const server = createOmfmServer({
       store,
@@ -248,8 +244,6 @@ describe('local proxy server', () => {
       ],
       fetchedAt: new Date().toISOString(),
     });
-    store.recordSuccess('nvidia/same', 1);
-    store.recordSuccess('same', 100);
     const seen: any[] = [];
     const server = createOmfmServer({
       store,
@@ -276,16 +270,14 @@ describe('local proxy server', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-derived-upstream-request-'));
     roots.push(root);
     const store = new ConfigStore(root);
-    store.updateSelectedModelIds(['nvidia/foo', 'fast:free']);
+    store.updateSelectedModelIds(['nvidia/foo', 'model-b:free']);
     store.writeModelCache({
       models: [
         { id: 'nvidia/foo', name: 'NVIDIA Foo', provider: 'nvidia', source: 'nvidia' },
-        { id: 'fast:free', name: 'Fast', provider: 'test', source: 'openrouter', raw: { id: 'fast:free', pricing: { prompt: '0', completion: '0' } } },
+        { id: 'model-b:free', name: 'Model B', provider: 'test', source: 'openrouter', raw: { id: 'model-b:free', pricing: { prompt: '0', completion: '0' } } },
       ],
       fetchedAt: new Date().toISOString(),
     });
-    store.recordSuccess('fast:free', 1);
-    store.recordSuccess('nvidia/foo', 100);
     const seen: any[] = [];
     const server = createOmfmServer({
       store,
@@ -333,16 +325,14 @@ describe('local proxy server', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-mixed-provider-'));
     roots.push(root);
     const store = new ConfigStore(root);
-    store.updateSelectedModelIds(['nvidia/meta/llama-3.1-8b-instruct', 'fast:free']);
+    store.updateSelectedModelIds(['nvidia/meta/llama-3.1-8b-instruct', 'model-b:free']);
     store.writeModelCache({
       models: [
         { id: 'nvidia/meta/llama-3.1-8b-instruct', upstreamId: 'meta/llama-3.1-8b-instruct', name: 'Llama', provider: 'nvidia', source: 'nvidia' },
-        { id: 'fast:free', name: 'Fast', provider: 'test', source: 'openrouter', raw: { id: 'fast:free', pricing: { prompt: '0', completion: '0' } } },
+        { id: 'model-b:free', name: 'Model B', provider: 'test', source: 'openrouter', raw: { id: 'model-b:free', pricing: { prompt: '0', completion: '0' } } },
       ],
       fetchedAt: new Date().toISOString(),
     });
-    store.recordSuccess('nvidia/meta/llama-3.1-8b-instruct', 1);
-    store.recordSuccess('fast:free', 10);
     const seen: any[] = [];
     await withServer(store, (async (url, init) => {
       seen.push({ url: String(url), body: JSON.parse(String(init?.body)) });
@@ -351,32 +341,27 @@ describe('local proxy server', () => {
       const res = await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] }) });
       const body = await res.json() as any;
       expect(res.status).toBe(200);
-      expect(body.model).toBe('fast:free');
+      expect(body.model).toBe('model-b:free');
       expect(seen).toHaveLength(1);
       expect(seen[0].url).toContain('openrouter.ai');
     });
   });
 
-  it('avoids retrying a model that just hit a rate limit on the next request', async () => {
+  it('retries on failure and records usage for both attempts', async () => {
     const store = tempStore();
     const calls: string[] = [];
     const mockFetch: FetchLike = async (_url, init) => {
       const body = JSON.parse(String(init?.body));
       calls.push(body.model);
-      if (body.model === 'slow:free') return new Response('{"error":{"message":"rate limit","code":429}}', { status: 429 });
+      if (body.model === 'model-a:free') return new Response('{"error":{"message":"rate limit","code":429}}', { status: 429 });
       return Response.json({ id: 'chatcmpl_1', model: body.model, choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }] });
     };
     await withServer(store, mockFetch, async (base) => {
       const first = await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] }) });
       const firstBody = await first.json() as any;
-      expect(firstBody.model).toBe('fast:free');
-      expect(calls).toEqual(['slow:free', 'fast:free']);
-      expect(store.readLatency()['slow:free']?.lastStatus).toBe('rate-limited');
-      expect(store.readUsage()['slow:free']).toMatchObject({ requests: 1, failures: 1, lastStatus: 'rate-limited', lastHttpStatus: 429 });
-      const second = await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'auto', messages: [{ role: 'user', content: 'hi' }] }) });
-      const secondBody = await second.json() as any;
-      expect(secondBody.model).toBe('fast:free');
-      expect(calls).toEqual(['slow:free', 'fast:free', 'slow:free', 'fast:free']);
+      expect(firstBody.model).toBe('model-b:free');
+      expect(calls).toEqual(['model-a:free', 'model-b:free']);
+      expect(store.readUsage()['model-a:free']).toMatchObject({ requests: 1, failures: 1, lastStatus: 'rate-limited', lastHttpStatus: 429 });
     });
   });
 
@@ -393,9 +378,6 @@ describe('local proxy server', () => {
       ],
       fetchedAt: new Date().toISOString(),
     });
-    store.recordSuccess('nvidia/one', 1);
-    store.recordSuccess('nvidia/two', 2);
-    store.recordSuccess('openrouter/usable:free', 3);
     const seen: any[] = [];
     await withServer(store, (async (url, init) => {
       seen.push({ url: String(url), body: JSON.parse(String(init?.body)) });
@@ -419,7 +401,7 @@ describe('local proxy server', () => {
     await withServer(store, mockFetch, async (base) => {
       const res = await fetch(`${base}/anthropic/v1/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'x-api-key': 'local' }, body: JSON.stringify({ model: 'auto', max_tokens: 10, messages: [{ role: 'user', content: 'hi' }] }) });
       const body = await res.json() as any;
-      expect(body.model).toBe('slow:free');
+      expect(body.model).toBe('model-a:free');
       expect(seen[0].url).toContain('/api/v1/messages');
     });
   });

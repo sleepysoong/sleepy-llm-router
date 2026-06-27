@@ -5,7 +5,7 @@ import { loadModelCatalog } from '../providers/catalog.js';
 import { postNvidiaChatCompletion } from '../providers/nvidia.js';
 import { isFreeOpenRouterModel, postOpenRouterAnthropicMessage, postOpenRouterChatCompletion } from '../providers/openrouter.js';
 import { FetchLike, ModelGroups, OmfmModel, ProviderApiKeys } from '../types.js';
-import { chooseGroupedModel, orderedCandidates, RouteChoice } from '../latency/router.js';
+import { orderedCandidates, RouteChoice } from '../latency/router.js';
 import { anthropicToOpenAI, openAIToAnthropic } from './translate.js';
 import { pipeOpenAIStreamAsAnthropic, pipeWebStreamToNode } from './sse.js';
 
@@ -24,7 +24,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 
 export type ServerLogEvent =
   | { type: 'request'; id: number; method: string; path: string }
-  | { type: 'response'; id: number; method: string; path: string; statusCode: number; durationMs: number; requestedModel?: string; modelId?: string; routeReason?: RouteChoice['reason'] | 'failover'; observedLatencyMs?: number; stream?: boolean };
+  | { type: 'response'; id: number; method: string; path: string; statusCode: number; durationMs: number; requestedModel?: string; modelId?: string; routeReason?: RouteChoice['reason'] | 'failover'; stream?: boolean };
 
 interface FormatServerLogEventOptions {
   color?: boolean;
@@ -58,7 +58,6 @@ export function formatServerLogEvent(event: ServerLogEvent, options: FormatServe
   if (event.requestedModel) details.push(`requested=${safeLogValue(event.requestedModel)}`);
   if (event.modelId) details.push(`model=${safeLogValue(event.modelId)}`);
   if (event.routeReason) details.push(`route=${event.routeReason}`);
-  if (typeof event.observedLatencyMs === 'number' && Number.isFinite(event.observedLatencyMs)) details.push(`cached=${event.observedLatencyMs}ms`);
   if (event.stream) details.push('stream=true');
   return details.join(' ');
 }
@@ -81,15 +80,6 @@ async function readBody(req: IncomingMessage): Promise<any> {
   const text = Buffer.concat(chunks).toString('utf8');
   if (!text) return {};
   return JSON.parse(text);
-}
-
-function headersFromIncoming(req: IncomingMessage): Headers {
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (Array.isArray(value)) headers.set(key, value.join(', '));
-    else if (value !== undefined) headers.set(key, value);
-  }
-  return headers;
 }
 
 function sourceOf(model: OmfmModel): 'openrouter' | 'nvidia' {
@@ -177,11 +167,6 @@ function usageFromResponse(data: Record<string, any> | undefined): { inputTokens
   return { inputTokens, outputTokens, totalTokens };
 }
 
-function estimateInputTokens(body: unknown): number {
-  const text = JSON.stringify(body ?? {});
-  return Math.max(1, Math.ceil(text.length / 4));
-}
-
 function recordSuccessfulUsage(store: ConfigStore, model: OmfmModel, httpStatus: number, data?: Record<string, any>): void {
   store.recordUsage(model.usageId ?? model.id, { success: true, httpStatus, ...usageFromResponse(data) });
 }
@@ -189,7 +174,6 @@ function recordSuccessfulUsage(store: ConfigStore, model: OmfmModel, httpStatus:
 async function recordUpstreamFailure(store: ConfigStore, model: OmfmModel, upstream: Response): Promise<string> {
   const text = await upstream.text();
   const status = upstream.status === 429 ? 'rate-limited' : upstream.status === 402 ? 'payment' : 'failed';
-  store.recordFailure(model.id, { status, httpStatus: upstream.status, error: text.slice(0, 500) });
   store.recordUsage(model.usageId ?? model.id, { success: false, httpStatus: upstream.status, status });
   return text;
 }
@@ -219,7 +203,6 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
     let requestedModel: string | undefined;
     let routedModel: string | undefined;
     let routeReason: RouteChoice['reason'] | 'failover' | undefined;
-    let observedLatencyMs: number | undefined;
     let stream: boolean | undefined;
     try {
       const method = req.method ?? 'GET';
@@ -237,7 +220,6 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             requestedModel,
             modelId: routedModel,
             routeReason,
-            observedLatencyMs,
             stream,
           });
         });
@@ -268,10 +250,8 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         stream = Boolean(body.stream);
         const selected = await selectedModelSelection(store, apiKeys, fetchImpl);
         assertSelectedFree(selected.models);
-        const observations = store.readLatency();
         const routingModel = requestedModelForRouting(selected.models, body.model);
-        const routeChoice = requestLogger ? chooseGroupedModel(selected.ids, observations, routingModel, selected.modelGroups) : undefined;
-        const candidateIds = orderedCandidates(selected.ids, observations, routingModel, selected.modelGroups);
+        const candidateIds = orderedCandidates(selected.ids, routingModel, selected.modelGroups);
         let lastError: unknown;
         let attempts = 0;
         for (const modelId of candidateIds) {
@@ -285,17 +265,14 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
           }
           if (requestLogger) {
             routedModel = modelId;
-            routeReason = modelId === routeChoice?.modelId ? routeChoice.reason : 'failover';
-            observedLatencyMs = numberValue(observations[modelId]?.latencyMs);
+            routeReason = attempts === 0 ? 'fallback-order' : 'failover';
           }
           attempts += 1;
-          const started = Date.now();
           const upstreamBody = withUpstreamModel(body, model);
           const upstream = sourceOf(model) === 'nvidia'
             ? await postNvidiaChatCompletion({ apiKey, body: upstreamBody, fetchImpl })
             : await postOpenRouterChatCompletion({ apiKey, body: upstreamBody, stream, fetchImpl });
           if (upstream.ok) {
-            store.recordSuccess(modelId, Date.now() - started);
             if (stream) {
               recordSuccessfulUsage(store, model, upstream.status);
               res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') ?? 'text/event-stream; charset=utf-8' });
@@ -324,10 +301,8 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         stream = Boolean(body.stream);
         const selected = await selectedModelSelection(store, apiKeys, fetchImpl);
         assertSelectedFree(selected.models);
-        const observations = store.readLatency();
         const routingModel = requestedModelForRouting(selected.models, body.model);
-        const routeChoice = requestLogger ? chooseGroupedModel(selected.ids, observations, routingModel, selected.modelGroups) : undefined;
-        const candidateIds = orderedCandidates(selected.ids, observations, routingModel, selected.modelGroups);
+        const candidateIds = orderedCandidates(selected.ids, routingModel, selected.modelGroups);
         let lastError: unknown;
         let attempts = 0;
         for (const modelId of candidateIds) {
@@ -341,16 +316,13 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
           }
           if (requestLogger) {
             routedModel = modelId;
-            routeReason = modelId === routeChoice?.modelId ? routeChoice.reason : 'failover';
-            observedLatencyMs = numberValue(observations[modelId]?.latencyMs);
+            routeReason = attempts === 0 ? 'fallback-order' : 'failover';
           }
           attempts += 1;
-          const started = Date.now();
           if (sourceOf(model) === 'nvidia') {
             const fallbackBody = anthropicToOpenAI(body, upstreamId(model));
             const upstream = await postNvidiaChatCompletion({ apiKey, body: fallbackBody, fetchImpl });
             if (upstream.ok) {
-              store.recordSuccess(modelId, Date.now() - started);
               await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => recordSuccessfulUsage(store, model, upstream.status, data));
               return;
             }
@@ -359,18 +331,16 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
           }
 
           const upstreamBody = withUpstreamModel(body, model);
-          let upstream = await postOpenRouterAnthropicMessage({ apiKey, body: upstreamBody, headers: headersFromIncoming(req), fetchImpl });
+          let upstream = await postOpenRouterAnthropicMessage({ apiKey, body: upstreamBody, fetchImpl });
           if (!upstream.ok && (upstream.status === 404 || upstream.status === 405)) {
             const fallbackBody = anthropicToOpenAI(body, upstreamId(model));
             upstream = await postOpenRouterChatCompletion({ apiKey, body: fallbackBody, stream, fetchImpl });
             if (upstream.ok) {
-              store.recordSuccess(modelId, Date.now() - started);
               await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => recordSuccessfulUsage(store, model, upstream.status, data));
               return;
             }
           }
           if (upstream.ok) {
-            store.recordSuccess(modelId, Date.now() - started);
             if (stream) {
               recordSuccessfulUsage(store, model, upstream.status);
               res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') ?? 'text/event-stream; charset=utf-8' });
@@ -407,4 +377,9 @@ export async function listen(server: http.Server, port: number): Promise<number>
   });
   const address = server.address();
   return typeof address === 'object' && address ? address.port : port;
+}
+
+function estimateInputTokens(body: unknown): number {
+  const text = JSON.stringify(body ?? {});
+  return Math.max(1, Math.ceil(text.length / 4));
 }

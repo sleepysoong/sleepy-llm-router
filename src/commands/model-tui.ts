@@ -1,17 +1,14 @@
 import { Writable, Readable } from 'node:stream';
 import { ConfigStore } from '../config/store.js';
-import { probeProviderModel } from '../latency/probe.js';
-import { ProbeTerminalState, runProbeScheduler } from '../latency/probe-scheduler.js';
 import { DEFAULT_MODEL_GROUPS, MODEL_GROUP_NAMES } from '../model-groups.js';
 import { FetchLike, ModelGroupName, ModelGroups, OmfmModel, ProviderApiKeys } from '../types.js';
-import { buildModelRows, filterListableModelRows, ModelDisplayRow, recommendModel, renderStaticModelTable, sortModelRows } from './model-view.js';
+import { buildModelRows, filterListableModelRows, ModelDisplayRow, renderStaticModelTable, sortModelRows } from './model-view.js';
 
 export interface ModelTuiResult {
   selectedModelIds: string[];
   modelGroups: ModelGroups;
   saved: boolean;
   interrupted: boolean;
-  terminalState: ProbeTerminalState | 'idle';
 }
 
 export type ModelTuiTab = 'all' | ModelGroupName;
@@ -24,7 +21,6 @@ interface RawModelTuiOptions {
   stdin?: NodeJS.ReadStream | Readable;
   stdout?: NodeJS.WriteStream | Writable;
   save: (selectedModelIds: string[], modelGroups: ModelGroups) => void;
-  startProbes: (handlers: { onRow: (row: Partial<ModelDisplayRow> & { modelId: string }) => void; signal: AbortSignal }) => Promise<ProbeTerminalState>;
   isTTY?: boolean;
 }
 
@@ -38,7 +34,6 @@ export interface ModelTuiOptions {
   stdin?: NodeJS.ReadStream | Readable;
   stdout?: NodeJS.WriteStream | Writable;
   fetchImpl?: FetchLike;
-  runScheduler?: typeof runProbeScheduler;
 }
 
 const ESC = '\u001b';
@@ -144,7 +139,6 @@ async function runRawModelTui(options: RawModelTuiOptions): Promise<ModelTuiResu
     for (const id of groupSelections[group]) selected.add(id);
   }
   const initialSelectedModelIds = rows.filter((row) => selected.has(row.model.id)).map((row) => row.model.id);
-  const controller = new AbortController();
   let activeTab = normalizeTab(options.initialTab);
   let cursor = 0;
   let scrollOffset = 0;
@@ -152,11 +146,10 @@ async function runRawModelTui(options: RawModelTuiOptions): Promise<ModelTuiResu
   let hasRendered = false;
   let saved = false;
   let interrupted = false;
-  let terminalState: ProbeTerminalState | 'idle' = 'idle';
 
   const tableViewportRows = () => {
     const terminalRows = terminalDimension(stdout, 'LINES', 24);
-    const fixedRows = terminalState === 'quota-deferred' ? 5 : 4; // title, tabs, legend, optional note, table header
+    const fixedRows = 4; // title, tabs, legend, table header
     return Math.max(1, terminalRows - fixedRows);
   };
 
@@ -198,13 +191,12 @@ async function runRawModelTui(options: RawModelTuiOptions): Promise<ModelTuiResu
     const showingStart = rows.length === 0 ? 0 : scrollOffset + 1;
     const showingEnd = Math.min(rows.length, scrollOffset + viewportRows);
     const maxWidth = Math.max(20, terminalDimension(stdout, 'COLUMNS', 100) - 1);
-    const status = terminalState === 'idle' ? 'probing…' : terminalState;
+    const status = 'ready';
     const lines = [
       clearLine(`omfm model  •  ${tabLabel(activeTab)} pool  •  Rows ${showingStart}-${showingEnd}/${rows.length}  •  ${status}`),
       clearLine(renderTabs()),
       clearLine('▶ current   ● in active tab   ○ not in tab   Tab/h/l switch   ↑↓/jk move   Space toggle   Enter save   q cancel'),
-      ...(terminalState === 'quota-deferred' ? [clearLine('Probe note: quota/payment limit reached; remaining rows deferred.')] : []),
-      renderStaticModelTable(visibleRows, { activeIndex: cursor - scrollOffset, colorLatency: true, colorRecommendation: true, interactive: true, maxWidth, measureRows: viewRows, minBodyRows: viewportRows })
+      renderStaticModelTable(visibleRows, { activeIndex: cursor - scrollOffset, colorRecommendation: true, interactive: true, maxWidth, measureRows: viewRows, minBodyRows: viewportRows })
         .split('\n')
         .filter((row) => row.length > 0)
         .map(clearLine),
@@ -219,7 +211,6 @@ async function runRawModelTui(options: RawModelTuiOptions): Promise<ModelTuiResu
   };
 
   const cleanup = () => {
-    controller.abort();
     setRawMode(stdin, false);
     stdin.pause?.();
     write(stdout, `${DISABLE_MOUSE}${ESC}[?25h${ESC}[0m${EXIT_ALT_SCREEN}`);
@@ -228,39 +219,14 @@ async function runRawModelTui(options: RawModelTuiOptions): Promise<ModelTuiResu
   render();
   setRawMode(stdin, true);
   stdin.resume?.();
-  options.startProbes({
-    signal: controller.signal,
-    onRow: (update) => {
-      const rowIndex = rows.findIndex((candidate) => candidate.model.id === update.modelId);
-      const row = rowIndex >= 0 ? rows[rowIndex] : undefined;
-      if (!row) return;
-      if (update.status === 'failed') {
-        rows.splice(rowIndex, 1);
-        selected.delete(update.modelId);
-        for (const group of MODEL_GROUP_NAMES) groupSelections[group] = groupSelections[group].filter((candidate) => candidate !== update.modelId);
-        if (!done) render();
-        return;
-      }
-      if (update.status) row.status = update.status;
-      if (typeof update.latencyMs === 'number') row.latencyMs = update.latencyMs;
-      row.recommendation = recommendModel(row);
-      if (!done) render();
-    },
-  })
-    .then((state) => {
-      terminalState = state;
-      if (!done) render();
-      return state;
-    })
-    .catch(() => 'aborted' as ProbeTerminalState);
 
   return new Promise<ModelTuiResult>((resolve) => {
-    const finish = (result: Omit<ModelTuiResult, 'terminalState'>) => {
+    const finish = (result: Omit<ModelTuiResult, 'terminalState'> & { terminalState?: string }) => {
       if (done) return;
       done = true;
       stdin.off?.('data', onData);
       cleanup();
-      resolve({ ...result, terminalState });
+      resolve({ selectedModelIds: result.selectedModelIds, modelGroups: result.modelGroups, saved: result.saved, interrupted: result.interrupted });
     };
     const onData = (chunk: Buffer | string) => {
       const key = keyName(chunk);
@@ -334,9 +300,8 @@ async function runRawModelTui(options: RawModelTuiOptions): Promise<ModelTuiResu
 
 export async function runModelTui(options: ModelTuiOptions): Promise<ModelTuiResult> {
   const selectedIds = new Set(options.selectedModelIds);
-  const latency = options.store.readLatency();
   const rows = sortModelRows(
-    filterListableModelRows(buildModelRows(options.models, selectedIds, latency), latency),
+    filterListableModelRows(buildModelRows(options.models, selectedIds)),
     { selectedFirst: true },
   );
   return runRawModelTui({
@@ -347,20 +312,5 @@ export async function runModelTui(options: ModelTuiOptions): Promise<ModelTuiRes
     stdin: options.stdin,
     stdout: options.stdout,
     save: () => undefined,
-    startProbes: ({ onRow, signal }) =>
-      (options.runScheduler ?? runProbeScheduler)({
-        models: rows.map((row) => row.model),
-        store: options.store,
-        signal,
-        probe: (model, probeSignal) => {
-          onRow({ modelId: model.id, status: 'probing' });
-          const source = model.source ?? 'openrouter';
-          const apiKey = options.apiKeys[source];
-          if (!apiKey) return Promise.resolve({ modelId: model.id, status: 'failed', error: `${source} API key is not configured` });
-          return probeProviderModel({ apiKey, model, fetchImpl: options.fetchImpl, signal: probeSignal });
-        },
-        onUpdate: ({ modelId, result }) => onRow({ modelId, status: result.status === 'payment' ? 'quota' : result.status, latencyMs: result.latencyMs }),
-        onDeferred: (modelId) => onRow({ modelId, status: 'deferred' }),
-      }),
   });
 }

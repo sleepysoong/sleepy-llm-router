@@ -17,18 +17,6 @@ export interface OmfmModel {
   raw?: unknown;
 }
 
-export interface LatencyObservation {
-  modelId: string;
-  latencyMs: number;
-  updatedAt: string;
-  successes: number;
-  failures: number;
-  lastStatus?: string;
-  lastHttpStatus?: number;
-  lastError?: string;
-  cooldownUntil?: string;
-}
-
 export interface UsageObservation {
   modelId: string;
   requests: number;
