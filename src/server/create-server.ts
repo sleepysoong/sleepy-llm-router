@@ -24,7 +24,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 
 export type ServerLogEvent =
   | { type: 'request'; id: number; method: string; path: string }
-  | { type: 'response'; id: number; method: string; path: string; statusCode: number; durationMs: number; requestedModel?: string; modelId?: string; routeReason?: RouteChoice['reason'] | 'failover'; stream?: boolean };
+  | { type: 'response'; id: number; method: string; path: string; statusCode: number; durationMs: number; requestedModel?: string; modelId?: string; routeReason?: RouteChoice['reason'] | 'failover'; stream?: boolean; inputTokens?: number; outputTokens?: number };
 
 interface FormatServerLogEventOptions {
   color?: boolean;
@@ -58,6 +58,8 @@ export function formatServerLogEvent(event: ServerLogEvent, options: FormatServe
   if (event.requestedModel) details.push(`requested=${safeLogValue(event.requestedModel)}`);
   if (event.modelId) details.push(`model=${safeLogValue(event.modelId)}`);
   if (event.routeReason) details.push(`route=${event.routeReason}`);
+  if (typeof event.inputTokens === 'number') details.push(`in=${event.inputTokens}`);
+  if (typeof event.outputTokens === 'number') details.push(`out=${event.outputTokens}`);
   if (event.stream) details.push('stream=true');
   return details.join(' ');
 }
@@ -204,6 +206,8 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
     let routedModel: string | undefined;
     let routeReason: RouteChoice['reason'] | 'failover' | undefined;
     let stream: boolean | undefined;
+    let lastInputTokens: number | undefined;
+    let lastOutputTokens: number | undefined;
     try {
       const method = req.method ?? 'GET';
       const url = new URL(req.url ?? '/', 'http://localhost');
@@ -221,6 +225,8 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             modelId: routedModel,
             routeReason,
             stream,
+            inputTokens: lastInputTokens,
+            outputTokens: lastOutputTokens,
           });
         });
       }
@@ -280,6 +286,9 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
               return;
             }
             const data = await upstream.json() as Record<string, any>;
+            const usage = usageFromResponse(data);
+            lastInputTokens = usage.inputTokens;
+            lastOutputTokens = usage.outputTokens;
             recordSuccessfulUsage(store, model, upstream.status, data);
             json(res, upstream.status, data);
             return;
@@ -323,7 +332,12 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             const fallbackBody = anthropicToOpenAI(body, upstreamId(model));
             const upstream = await postNvidiaChatCompletion({ apiKey, body: fallbackBody, fetchImpl });
             if (upstream.ok) {
-              await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => recordSuccessfulUsage(store, model, upstream.status, data));
+              await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => {
+                const usage = usageFromResponse(data);
+                lastInputTokens = usage.inputTokens;
+                lastOutputTokens = usage.outputTokens;
+                recordSuccessfulUsage(store, model, upstream.status, data);
+              });
               return;
             }
             lastError = await recordUpstreamFailure(store, model, upstream);
@@ -336,7 +350,12 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             const fallbackBody = anthropicToOpenAI(body, upstreamId(model));
             upstream = await postOpenRouterChatCompletion({ apiKey, body: fallbackBody, stream, fetchImpl });
             if (upstream.ok) {
-              await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => recordSuccessfulUsage(store, model, upstream.status, data));
+              await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => {
+                const usage = usageFromResponse(data);
+                lastInputTokens = usage.inputTokens;
+                lastOutputTokens = usage.outputTokens;
+                recordSuccessfulUsage(store, model, upstream.status, data);
+              });
               return;
             }
           }
@@ -348,6 +367,9 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
               return;
             }
             const data = await upstream.json() as Record<string, any>;
+            const usage = usageFromResponse(data);
+            lastInputTokens = usage.inputTokens;
+            lastOutputTokens = usage.outputTokens;
             recordSuccessfulUsage(store, model, upstream.status, data);
             json(res, upstream.status, data);
             return;
