@@ -1,10 +1,6 @@
-<p align="center">
-  <img src="../sleepy-llm-router-character.png" height="96" alt="sleepy-llm-router character" />
-</p>
-
 # sleepy-llm-router
 
-[English](../README.md) | 한국어 | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md)
+[English](../README.md) | 한국어
 
 `sleepy-llm-router` (`slr`) 는 코딩 에이전트를 여러 무료 provider 중 설정된 순서대로 라우팅하는 로컬 프록시입니다. OpenAI 또는 Anthropic 호환 에이전트의 baseURL을 `localhost` 로 바꾸고 free 모델 몇 개를 골라두면, rate-limit이나 quota 문제가 생겨도 `slr` 이 요청을 계속 흘려보냅니다.
 

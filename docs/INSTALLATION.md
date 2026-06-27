@@ -1,6 +1,6 @@
 # Installation and Setup
 
-English | [한국어](./INSTALLATION.ko.md) | [简体中文](./INSTALLATION.zh-CN.md) | [繁體中文](./INSTALLATION.zh-TW.md) | [日本語](./INSTALLATION.ja.md)
+English | [한국어](./INSTALLATION.ko.md)
 
 This document covers installing `sleepy-llm-router` (`slr`), configuring provider keys, setting up models, running the local proxy, and connecting clients. For the project's purpose and motivation, see [README.md](../README.md).
 

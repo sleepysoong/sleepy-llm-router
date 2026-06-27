@@ -1,10 +1,6 @@
-<p align="center">
-  <img src="./oh-my-free-models-character.png" height="96" alt="sleepy-llm-router character" />
-</p>
-
 # sleepy-llm-router
 
-English | [한국어](./docs/README.ko.md) | [简体中文](./docs/README.zh-CN.md) | [繁體中文](./docs/README.zh-TW.md) | [日本語](./docs/README.ja.md)
+English | [한국어](./docs/README.ko.md)
 
 `sleepy-llm-router` (`slr`) is a local proxy that routes your coding agent to free models across providers. Point your OpenAI- or Anthropic-compatible agent at `localhost`, configure a few free models, and `slr` keeps requests flowing as rate limits and quotas shift underneath.
 
