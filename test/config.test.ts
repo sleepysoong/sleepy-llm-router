@@ -7,7 +7,7 @@ import { ConfigStore, MODEL_CACHE_TTL_MS, isModelCacheFresh } from '../src/confi
 
 const roots: string[] = [];
 function tempRoot() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-test-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-test-'));
   roots.push(root);
   return root;
 }
@@ -20,7 +20,7 @@ describe('config/env', () => {
     expect(resolveOpenRouterApiKey({ OPENROUTER_API_KEY: 'global' } as NodeJS.ProcessEnv, root)).toBe('global');
   });
 
-  it('falls back to ~/.oh-my-free-models/.env equivalent', () => {
+  it('falls back to ~/.sleepy-llm-router/.env equivalent', () => {
     const root = tempRoot();
     fs.writeFileSync(path.join(root, '.env'), 'OPENROUTER_API_KEY="local-key"\n');
     expect(resolveOpenRouterApiKey({} as NodeJS.ProcessEnv, root)).toBe('local-key');

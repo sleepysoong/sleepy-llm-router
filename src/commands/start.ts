@@ -10,7 +10,7 @@ export async function runStartCommand(options: { port?: number; store?: ConfigSt
 
   const server = createOmfmServer({ store, requestLogger: (event) => console.log(formatServerLogEvent(event, { color: process.stdout.isTTY })) });
   const actualPort = await listen(server, port);
-  console.log(`omfm listening on http://localhost:${actualPort}`);
+  console.log(`slr가 http://localhost:${actualPort}에서 실행 중이에요.`);
 
   const shutdown = () => {
     server.close(() => process.exit(0));

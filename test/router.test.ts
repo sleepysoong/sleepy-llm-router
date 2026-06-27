@@ -24,7 +24,7 @@ describe('config-order router', () => {
 
   it('routes group aliases within the configured group only', () => {
     const groups = { fast: ['b'], balanced: ['a'], capable: ['c'] };
-    expect(chooseGroupedModel(['a', 'b', 'c'], 'omfm/fast', groups)).toEqual({ modelId: 'b', reason: 'model-group' });
+    expect(chooseGroupedModel(['a', 'b', 'c'], 'slr/fast', groups)).toEqual({ modelId: 'b', reason: 'model-group' });
     expect(orderedCandidates(['a', 'b', 'c'], 'haiku', groups)).toEqual(['b']);
   });
 

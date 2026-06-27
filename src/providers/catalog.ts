@@ -75,5 +75,5 @@ export async function loadModelCatalog(options: { apiKeys: ProviderApiKeys; fetc
     return { models: result.models, source: 'fetched', errors: result.errors };
   }
   if (cache && cachedModels.length > 0) return { models: cachedModels, source: 'stale', errors: result.errors };
-  throw new Error(result.errors.length > 0 ? `All provider model fetches failed: ${result.errors.join('; ')}` : 'No provider models are available.');
+  throw new Error(result.errors.length > 0 ? `모든 프로바이더 모델 가져오기 실패: ${result.errors.join('; ')}` : '사용 가능한 프로바이더 모델이 없어요.');
 }

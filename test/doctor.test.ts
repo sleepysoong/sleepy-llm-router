@@ -7,7 +7,7 @@ import { ConfigStore } from '../src/config/store.js';
 
 const roots: string[] = [];
 function tempStore(): ConfigStore {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-doctor-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-doctor-'));
   roots.push(root);
   return new ConfigStore(root);
 }
@@ -39,8 +39,8 @@ describe('doctor command', () => {
 
     const out = output();
     printDoctorStatus({ store, env: { OPENROUTER_API_KEY: 'sk-or-process' } as NodeJS.ProcessEnv, stdout: out.stream });
-    expect(out.text()).toContain('omfm doctor');
-    expect(out.text()).toContain('OpenRouter: process, prefix ok');
-    expect(out.text()).toContain('NVIDIA: local-env, prefix ok');
+    expect(out.text()).toContain('slr 진단');
+    expect(out.text()).toContain('OpenRouter: process, 접두사 확인됨');
+    expect(out.text()).toContain('NVIDIA: local-env, 접두사 확인됨');
   });
 });

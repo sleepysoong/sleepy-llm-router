@@ -29,13 +29,13 @@ function parsePort(value: string | boolean | undefined): number | undefined {
   if (value === undefined || value === false) return undefined;
   const port = Number(value);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    throw new Error(`Invalid --port value: ${String(value)}`);
+    throw new Error(`잘못된 --port 값: ${String(value)}`);
   }
   return port;
 }
 
 function help(): void {
-  console.log(`oh-my-free-models ${VERSION}\n\nUsage:\n  omfm start [--port 4567]\n  omfm status\n  omfm usage [--json]\n  omfm doctor\n  omfm --version\n\nEnvironment:\n  OPENROUTER_API_KEY and NVIDIA_API_KEY are read from the process first, then ~/.oh-my-free-models/.env\n`);
+  console.log(`sleepy-llm-router ${VERSION}\n\n사용법:\n  slr start [--port 4567]\n  slr status\n  slr usage [--json]\n  slr doctor\n  slr --version\n\n환경변수:\n  OPENROUTER_API_KEY와 NVIDIA_API_KEY는 프로세스 환경변수에서 먼저 읽고, ~/.sleepy-llm-router/.env에서 읽어요.\n`);
 }
 
 async function main(): Promise<void> {

@@ -46,10 +46,10 @@ function statusColorCode(statusCode: number): number {
 }
 
 export function formatServerLogEvent(event: ServerLogEvent, options: FormatServerLogEventOptions = {}): string {
-  if (event.type === 'request') return `[omfm] #${event.id} ${color('request', 36, options.color)} ${event.method} ${safeLogValue(event.path)}`;
+  if (event.type === 'request') return `[slr] #${event.id} ${color('request', 36, options.color)} ${event.method} ${safeLogValue(event.path)}`;
   const statusColor = statusColorCode(event.statusCode);
   const details = [
-    `[omfm] #${event.id} ${color('response', statusColor, options.color)}`,
+    `[slr] #${event.id} ${color('response', statusColor, options.color)}`,
     color(String(event.statusCode), statusColor, options.color),
     `${event.durationMs}ms`,
     event.method,
@@ -122,7 +122,7 @@ async function selectedModelSelection(store: ConfigStore, apiKeys: ProviderApiKe
 
 function assertSelectedFree(models: OmfmModel[]): void {
   if (models.length === 0) {
-    throw Object.assign(new Error('No free models selected. Run `omfm model` to choose at least one free model.'), { statusCode: 400 });
+    throw Object.assign(new Error('선택된 무료 모델이 없어요. `slr model`에서 사용할 무료 모델을 하나 이상 선택하세요.'), { statusCode: 400 });
   }
 }
 
@@ -142,7 +142,7 @@ function requestedModelForRouting(models: OmfmModel[], requestedModel: unknown):
 }
 
 function noUsableModelResponse(res: ServerResponse, lastError: unknown): void {
-  json(res, 400, { error: { message: 'No selected free models are usable with the configured provider API keys.', details: String(lastError ?? '') } });
+  json(res, 400, { error: { message: '설정된 프로바이더 API 키로 사용 가능한 선택된 무료 모델이 없어요.', details: String(lastError ?? '') } });
 }
 
 function numberValue(value: unknown): number | undefined {
@@ -220,7 +220,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         });
       }
       if (method === 'GET' && url.pathname === '/health') {
-        json(res, 200, { ok: true, service: 'oh-my-free-models' });
+        json(res, 200, { ok: true, service: 'sleepy-llm-router' });
         return;
       }
 
@@ -288,7 +288,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
           noUsableModelResponse(res, lastError);
           return;
         }
-        json(res, 502, { error: { message: 'All selected free models failed.', details: String(lastError ?? '') } });
+        json(res, 502, { error: { message: '선택된 모든 무료 모델이 실패했어요.', details: String(lastError ?? '') } });
         return;
       }
 
@@ -369,7 +369,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
           noUsableModelResponse(res, lastError);
           return;
         }
-        json(res, 502, { error: { type: 'api_error', message: 'All selected free models failed.', details: String(lastError ?? '') } });
+        json(res, 502, { error: { type: 'api_error', message: '선택된 모든 무료 모델이 실패했어요.', details: String(lastError ?? '') } });
         return;
       }
 

@@ -1,24 +1,24 @@
 {
-  "name": "oh-my-free-models",
+  "name": "sleepy-llm-router",
   "version": "0.0.4",
   "description": "Route your coding agent to the fastest free LLM in real time.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hakilee/oh-my-free-models.git"
+    "url": "git+https://github.com/sleepysoong/sleepy-llm-router.git"
   },
-  "homepage": "https://github.com/hakilee/oh-my-free-models",
-  "bugs": "https://github.com/hakilee/oh-my-free-models/issues",
+  "homepage": "https://github.com/sleepysoong/sleepy-llm-router",
+  "bugs": "https://github.com/sleepysoong/sleepy-llm-router/issues",
   "type": "module",
   "bin": {
-    "omfm": "dist/cli.js"
+    "slr": "dist/cli.js"
   },
   "files": [
     "dist",
     "docs",
     "README.md",
     "LICENSE.md",
-    "oh-my-free-models-character.png"
+    "sleepy-llm-router-character.png"
   ],
   "scripts": {
     "docs:check": "node scripts/check-docs.mjs",

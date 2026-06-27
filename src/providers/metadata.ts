@@ -6,7 +6,7 @@ import type { FetchLike, ModelSource } from '../types.js';
 import { VERSION } from '../version.js';
 import { parseTokenCount } from './context-length.js';
 
-export const MODEL_METADATA_RAW_URL = 'https://raw.githubusercontent.com/hakilee/oh-my-free-models/model-metadata/data/model-metadata.json';
+export const MODEL_METADATA_RAW_URL = 'https://raw.githubusercontent.com/hakilee/sleepy-llm-router/model-metadata/data/model-metadata.json';
 const MODEL_METADATA_TIMEOUT_MS = 1_200;
 
 export interface ProviderModelMetadata {
@@ -54,7 +54,7 @@ function readLocalCatalog(): ProviderMetadataCatalog {
     const catalog = JSON.parse(readFileSync(catalogPath(), 'utf8')) as ProviderModelMetadataCatalog;
     return parseCatalog(catalog);
   } catch {
-    // No bundled metadata; runtime relies on the model-metadata branch raw URL.
+    // 번들 메타데이터가 없어요; 런타임은 model-metadata 브랜치의 원격 URL을 사용해요.
     return new Map();
   }
 }
@@ -66,7 +66,7 @@ async function fetchRemoteCatalog(fetchImpl: FetchLike): Promise<ProviderMetadat
     const response = await fetchImpl(MODEL_METADATA_RAW_URL, {
       headers: {
         Accept: 'application/json',
-        'User-Agent': `oh-my-free-models/${VERSION}`,
+        'User-Agent': `sleepy-llm-router/${VERSION}`,
       },
       signal: controller.signal,
     });

@@ -6,13 +6,13 @@ Use this route for latency routing, probe scheduling, candidate ordering, and re
 
 - Implementation anchors: [src/latency/router.ts](../src/latency/router.ts), [src/latency/probe.ts](../src/latency/probe.ts), [src/latency/probe-scheduler.ts](../src/latency/probe-scheduler.ts), [src/latency/background-prober.ts](../src/latency/background-prober.ts), and [src/config/store.ts](../src/config/store.ts) for cooldown bookkeeping.
 - `chooseModel` honors a requested model only when it is selected and not a generic alias, even when that model is in cooldown. Server routing normalizes provider upstream IDs to selected local IDs before calling the router.
-- `chooseGroupedModel` and server retry ordering recognize `omfm/fast`, `omfm/balanced`, `omfm/capable`, plus `haiku`, `sonnet`, and `opus` aliases. Non-empty groups route and retry only within that configured group; empty groups fall back to the full selected list.
+- `chooseGroupedModel` and server retry ordering recognize `slr/fast`, `slr/balanced`, `slr/capable`, plus `haiku`, `sonnet`, and `opus` aliases. Non-empty groups route and retry only within that configured group; empty groups fall back to the full selected list.
 - Generic or unknown requests choose the selected model with the lowest finite latency observation, skipping models whose `cooldownUntil` is still in the future.
 - Selected models that received a recent rate-limit (HTTP 429) or quota (HTTP 402) response enter a 10-minute cooldown and are not picked until the window expires.
 - When every selected model is in active cooldown, routing falls back to the full latency-ordered selection so requests do not stall.
-- If no latency is known, routing falls back to deterministic selected order. The model picker and `omfm model --all` write that order from the recommendation-sorted display; explicit `--select` keeps the provided order.
+- If no latency is known, routing falls back to deterministic selected order. The model picker and `slr model --all` write that order from the recommendation-sorted display; explicit `--select` keeps the provided order.
 - `orderedCandidates` orders retry candidates by status rank (healthy first, other failures next, cooling last), then by known latency and selected order, including latency ties.
-- `omfm start` runs a conservative background probe loop for selected models while the proxy is alive. It waits briefly after startup, probes selected models in low-concurrency batches, and repeats about every 5 minutes.
+- `slr start` runs a conservative background probe loop for selected models while the proxy is alive. It waits briefly after startup, probes selected models in low-concurrency batches, and repeats about every 5 minutes.
 
 ## Required route for latency work
 

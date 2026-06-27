@@ -8,7 +8,7 @@ import { FetchLike, OmfmModel } from '../src/types.js';
 
 const roots: string[] = [];
 function tempStore() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-server-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-server-'));
   roots.push(root);
   const store = new ConfigStore(root);
   store.updateSelectedModelIds(['model-a:free', 'model-b:free']);
@@ -43,7 +43,7 @@ describe('local proxy server', () => {
   });
 
   it('refreshes stale model cache before listing selected models', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-stale-model-cache-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-stale-model-cache-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['new:free']);
@@ -117,7 +117,7 @@ describe('local proxy server', () => {
       return Response.json({ id: 'chatcmpl_1', model: seen.at(-1).model, choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }] });
     };
     await withServer(store, mockFetch, async (base) => {
-      const res = await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'omfm/fast', messages: [{ role: 'user', content: 'hi' }] }) });
+      const res = await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'slr/fast', messages: [{ role: 'user', content: 'hi' }] }) });
       const body = await res.json() as any;
       expect(body.model).toBe('model-a:free');
       expect(seen[0].model).toBe('model-a:free');
@@ -157,7 +157,7 @@ describe('local proxy server', () => {
       const res = await fetch(`http://127.0.0.1:${port}/anthropic/v1/messages/count_tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: 'omfm/balanced', messages: [{ role: 'user', content: 'hello world' }] }),
+        body: JSON.stringify({ model: 'slr/balanced', messages: [{ role: 'user', content: 'hello world' }] }),
       });
       const body = await res.json() as any;
       expect(res.status).toBe(200);
@@ -169,7 +169,7 @@ describe('local proxy server', () => {
   });
 
   it('routes selected NVIDIA models with their upstream model id', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-nvidia-server-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-nvidia-server-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/deepseek-ai/deepseek-v3.2']);
@@ -199,7 +199,7 @@ describe('local proxy server', () => {
   });
 
   it('honors selected NVIDIA models requested by upstream id', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-nvidia-upstream-request-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-nvidia-upstream-request-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/deepseek-ai/deepseek-v3.2', 'model-b:free']);
@@ -233,7 +233,7 @@ describe('local proxy server', () => {
   });
 
   it('prefers an exact selected local id before an upstream id match', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-exact-before-upstream-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-exact-before-upstream-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['same', 'nvidia/same']);
@@ -267,7 +267,7 @@ describe('local proxy server', () => {
   });
 
   it('honors provider-prefixed selected models requested by derived upstream id', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-derived-upstream-request-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-derived-upstream-request-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/foo', 'model-b:free']);
@@ -301,7 +301,7 @@ describe('local proxy server', () => {
   });
 
   it('treats legacy OpenRouter nvidia/*:free cached rows as OpenRouter when source is absent', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-legacy-nvidia-openrouter-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-legacy-nvidia-openrouter-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/llama:free']);
@@ -322,7 +322,7 @@ describe('local proxy server', () => {
   });
 
   it('skips selected models whose provider key is missing and tries the next usable model', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-mixed-provider-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-mixed-provider-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/meta/llama-3.1-8b-instruct', 'model-b:free']);
@@ -366,7 +366,7 @@ describe('local proxy server', () => {
   });
 
   it('does not let missing-key candidates consume retry attempts before a usable model', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-missing-key-retries-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-missing-key-retries-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/one', 'nvidia/two', 'openrouter/usable:free']);
@@ -424,7 +424,7 @@ describe('local proxy server', () => {
   });
 
   it('returns actionable error when no models are selected', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-empty-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-empty-'));
     roots.push(root);
     const store = new ConfigStore(root);
     const server = createOmfmServer({ store, env: { OPENROUTER_API_KEY: 'key' } as NodeJS.ProcessEnv });
@@ -432,7 +432,7 @@ describe('local proxy server', () => {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [] }) });
       expect(res.status).toBe(400);
-      expect(await res.text()).toContain('omfm model');
+      expect(await res.text()).toContain('slr model');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
@@ -459,7 +459,7 @@ describe('streaming behavior', () => {
   });
 
   it('streams OpenAI chunks as Anthropic deltas before upstream closes', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-anthropic-stream-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-anthropic-stream-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/streamer']);
@@ -503,7 +503,7 @@ describe('streaming behavior', () => {
   });
 
   it('streams OpenAI tool-call chunks as Anthropic tool_use blocks', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-anthropic-tool-stream-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-anthropic-tool-stream-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/streamer']);
@@ -552,7 +552,7 @@ describe('streaming behavior', () => {
   });
 
   it('closes a text block before starting a streamed tool_use block', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-anthropic-mixed-stream-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-anthropic-mixed-stream-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['nvidia/streamer']);
@@ -604,7 +604,7 @@ describe('streaming behavior', () => {
 
 describe('free-model request boundary', () => {
   it('does not route to a selected non-free model from a tampered config/cache', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-paid-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-paid-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['paid/model']);
@@ -617,7 +617,7 @@ describe('free-model request boundary', () => {
     await withServer(store, mockFetch, async (base) => {
       const res = await fetch(`${base}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'paid/model', messages: [{ role: 'user', content: 'hi' }] }) });
       expect(res.status).toBe(400);
-      expect(await res.text()).toContain('free models');
+      expect(await res.text()).toContain('무료 모델');
       expect(called).toBe(false);
     });
   });

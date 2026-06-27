@@ -32,7 +32,7 @@ function readJson<T>(filePath: string, fallback: T): T {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
   } catch (error) {
-    throw new Error(`Failed to parse ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(`${filePath} 파싱에 실패했어요: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

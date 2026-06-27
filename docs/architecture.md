@@ -6,7 +6,7 @@ This package is a local Node.js proxy that lets coding agents point OpenAI-compa
 
 | Area | Source anchors | Responsibility | Verification |
 | --- | --- | --- | --- |
-| CLI entrypoint | [src/cli.ts](../src/cli.ts), `src/commands/*` | Parse `omfm` commands for model selection, daemon lifecycle, status, usage, and stop. | `test/cli.test.ts`, `test/model-command.test.ts`, `test/model-view.test.ts`, `test/model-tui.test.ts`, `test/usage.test.ts` |
+| CLI entrypoint | [src/cli.ts](../src/cli.ts), `src/commands/*` | Parse `slr` commands for model selection, daemon lifecycle, status, usage, and stop. | `test/cli.test.ts`, `test/model-command.test.ts`, `test/model-view.test.ts`, `test/model-tui.test.ts`, `test/usage.test.ts` |
 | Config/store | [src/config/store.ts](../src/config/store.ts), [src/config/env.ts](../src/config/env.ts), [src/config/paths.ts](../src/config/paths.ts) | Persist selected model IDs, latency observations, usage counters, daemon metadata, and API-key lookup. | `test/config.test.ts` |
 | Provider adapters | [src/providers/openrouter.ts](../src/providers/openrouter.ts), [src/providers/nvidia.ts](../src/providers/nvidia.ts), [src/providers/catalog.ts](../src/providers/catalog.ts) | List and normalize eligible free models, aggregate them through `listAvailableFreeModels`, preserve provider-specific IDs, and forward provider requests. | `test/openrouter.test.ts`, `test/nvidia.test.ts`, provider-related server/probe tests |
 | Latency layer | [src/latency/router.ts](../src/latency/router.ts), [src/latency/probe.ts](../src/latency/probe.ts), [src/latency/probe-scheduler.ts](../src/latency/probe-scheduler.ts), [src/latency/background-prober.ts](../src/latency/background-prober.ts) | Choose selected models by request match, observed latency, or deterministic fallback; probe with conservative pacing during model picking and server runtime. | `test/router.test.ts`, `test/probe.test.ts`, `test/probe-scheduler.test.ts`, `test/background-prober.test.ts` |
@@ -21,7 +21,7 @@ This package is a local Node.js proxy that lets coding agents point OpenAI-compa
 
 ## Reliability and security notes
 
-- API keys come from provider-specific environment variables or `~/.oh-my-free-models/.env`; do not log secrets in docs, tests, daemon logs, or provider error handling.
+- API keys come from provider-specific environment variables or `~/.sleepy-llm-router/.env`; do not log secrets in docs, tests, daemon logs, or provider error handling.
 - Routing is local and stateful: successful requests update latency cache, failures record failure state, and unknown or generic model requests should not bypass the selected-model allowlist.
 - Free-model filtering is a safety boundary. New provider work must define how free/text-eligible models are identified before exposing them through `/v1/models` or request routing.
 

@@ -19,7 +19,7 @@ const MODEL_GROUP_ALIASES: Record<string, ModelGroupName> = {
 
 export function normalizeModelGroupName(value: string | undefined): ModelGroupName | undefined {
   if (!value) return undefined;
-  const normalized = value.trim().toLowerCase().replace(/^omfm\//, '');
+  const normalized = value.trim().toLowerCase().replace(/^slr\//, '');
   return MODEL_GROUP_ALIASES[normalized];
 }
 

@@ -11,7 +11,7 @@ const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
 
 function tempStore(): ConfigStore {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-catalog-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-catalog-'));
   roots.push(root);
   return new ConfigStore(root);
 }

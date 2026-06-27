@@ -1,16 +1,16 @@
 <p align="center">
-  <img src="../oh-my-free-models-character.png" height="96" alt="oh-my-free-models character" />
+  <img src="../sleepy-llm-router-character.png" height="96" alt="sleepy-llm-router character" />
 </p>
 
-# oh-my-free-models
+# sleepy-llm-router
 
 [English](../README.md) | [한국어](./README.ko.md) | [简体中文](./README.zh-CN.md) | 繁體中文 | [日本語](./README.ja.md)
 
-`oh-my-free-models`（`omfm`）是一個本機代理，把你的 coding agent 導向多個 provider 中當下最快的免費模型。把 OpenAI 或 Anthropic 相容客戶端的 baseURL 指到 `localhost`，挑幾個免費模型，`omfm` 就會在 latency、rate-limit、quota 持續波動的情況下讓請求順暢地流過去。
+`sleepy-llm-router`（`slr`）是一個本機代理，把你的 coding agent 導向多個 provider 中當下最快的免費模型。把 OpenAI 或 Anthropic 相容客戶端的 baseURL 指到 `localhost`，挑幾個免費模型，`slr` 就會在 latency、rate-limit、quota 持續波動的情況下讓請求順暢地流過去。
 
 https://github.com/user-attachments/assets/44c07928-1544-4b33-a472-41e82f7aa7d7
 
-> `omfm` 驅動 OpenCode 在路由後的免費模型上運作的示範。
+> `slr` 驅動 OpenCode 在路由後的免費模型上運作的示範。
 
 ## 為什麼需要它
 
@@ -24,9 +24,9 @@ https://github.com/user-attachments/assets/44c07928-1544-4b33-a472-41e82f7aa7d7
 
 **免費模型目錄一直在變。** 模型出現又消失，被標記為 deprecated，或者悄悄開始回傳錯誤。不是哪個儀表板會通知你，而是你踢到牆才知道。
 
-## omfm 怎麼解決
+## slr 怎麼解決
 
-你給 `omfm` 一份你真的想用的免費模型 allowlist，它就在 `http://localhost:4567` 作為本機代理運行，並在背後處理這些工作。
+你給 `slr` 一份你真的想用的免費模型 allowlist，它就在 `http://localhost:4567` 作為本機代理運行，並在背後處理這些工作。
 
 | 功能 | 處理方式 |
 | --- | --- |
@@ -39,37 +39,37 @@ Agent 只認識 `localhost`。provider 切換、rate-limit 重試、挑出當前
 
 ## 申請 API 金鑰
 
-`omfm` 只負責轉送流量。你需要自己從一個或兩個 provider 申請金鑰。
+`slr` 只負責轉送流量。你需要自己從一個或兩個 provider 申請金鑰。
 
 **OpenRouter** — 在 [openrouter.ai](https://openrouter.ai) 註冊後，到 Keys 選單裡簽發金鑰（prefix `sk-or-`）。`:free` 模型每天最多 50 次請求；儲值至少 $10 的 credit 後，上限會提升到每天 1,000 次。免費額度不需要綁定信用卡。
 
 **NVIDIA** — 在 [build.nvidia.com](https://build.nvidia.com)（NVIDIA Developer Program）註冊後，在任一模型卡片上點擊 "Get API Key" 即可簽發（prefix `nvapi-`）。不需要綁定信用卡；rate-limit 依模型個別計算。
 
-把手上的金鑰寫進 `~/.oh-my-free-models/.env`，`omfm` 只會使用已設定金鑰的 provider。
+把手上的金鑰寫進 `~/.sleepy-llm-router/.env`，`slr` 只會使用已設定金鑰的 provider。
 
 ## 30 秒試用
 
 ```bash
-npm install -g oh-my-free-models
-mkdir -p ~/.oh-my-free-models && echo 'OPENROUTER_API_KEY=sk-or-...' > ~/.oh-my-free-models/.env
-omfm model        # 在 picker 裡挑幾個免費模型
-omfm start        # 啟動 http://localhost:4567
+npm install -g sleepy-llm-router
+mkdir -p ~/.sleepy-llm-router && echo 'OPENROUTER_API_KEY=sk-or-...' > ~/.sleepy-llm-router/.env
+slr model        # 在 picker 裡挑幾個免費模型
+slr start        # 啟動 http://localhost:4567
 ```
 
 ## 常用命令
 
 | 命令 | 用途 |
 | --- | --- |
-| `omfm model` | 開啟 picker，並儲存選取的免費模型。 |
-| `omfm model --all` | 不開啟 picker，直接列出所有可選模型。 |
-| `omfm model --no-tui` | 不開啟 TUI，透過帶編號的靜態表與單行提示選擇模型。 |
-| `omfm model --group fast --best` | Probe fast 群組，並輸出目前最佳候選。 |
-| `omfm start` | 在前景執行本機代理，並輸出 request/response 路由日誌。 |
-| `omfm start --daemon` | 在背景以 daemon 方式執行本機代理。 |
-| `omfm status` | 查看 daemon、config 與 best-route 狀態。 |
-| `omfm stop` | 停止背景 daemon。 |
-| `omfm doctor` | 檢查 config 路徑、金鑰、模型快取和 daemon 狀態。 |
-| `omfm usage` | 查看每個模型的請求數和 token 觀測值。 |
+| `slr model` | 開啟 picker，並儲存選取的免費模型。 |
+| `slr model --all` | 不開啟 picker，直接列出所有可選模型。 |
+| `slr model --no-tui` | 不開啟 TUI，透過帶編號的靜態表與單行提示選擇模型。 |
+| `slr model --group fast --best` | Probe fast 群組，並輸出目前最佳候選。 |
+| `slr start` | 在前景執行本機代理，並輸出 request/response 路由日誌。 |
+| `slr start --daemon` | 在背景以 daemon 方式執行本機代理。 |
+| `slr status` | 查看 daemon、config 與 best-route 狀態。 |
+| `slr stop` | 停止背景 daemon。 |
+| `slr doctor` | 檢查 config 路徑、金鑰、模型快取和 daemon 狀態。 |
+| `slr usage` | 查看每個模型的請求數和 token 觀測值。 |
 
 ## 從你的 Agent 使用
 
@@ -77,32 +77,32 @@ OpenAI 相容客戶端（OpenCode、Hermes Agent、OpenClaw 等）：
 
 ```text
 url=http://localhost:4567/v1
-model=omfm             # 整個池；或 omfm/fast, omfm/balanced, omfm/capable
+model=slr             # 整個池；或 slr/fast, slr/balanced, slr/capable
 ```
 
 Anthropic 相容客戶端（Claude Code 等）：
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:4567/anthropic
-export ANTHROPIC_AUTH_TOKEN=omfm-local
+export ANTHROPIC_AUTH_TOKEN=slr-local
 export ANTHROPIC_API_KEY=
 ```
 
-Claude Code 的模型別名（alias）也可以對應到 `omfm` 群組：
+Claude Code 的模型別名（alias）也可以對應到 `slr` 群組：
 
 ```bash
-alias freeclaude='ANTHROPIC_BASE_URL=http://localhost:4567/anthropic ANTHROPIC_AUTH_TOKEN=omfm-local ANTHROPIC_API_KEY= CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 ANTHROPIC_DEFAULT_OPUS_MODEL=omfm/capable ANTHROPIC_DEFAULT_SONNET_MODEL=omfm/balanced ANTHROPIC_DEFAULT_HAIKU_MODEL=omfm/fast claude'
+alias freeclaude='ANTHROPIC_BASE_URL=http://localhost:4567/anthropic ANTHROPIC_AUTH_TOKEN=slr-local ANTHROPIC_API_KEY= CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 ANTHROPIC_DEFAULT_OPUS_MODEL=slr/capable ANTHROPIC_DEFAULT_SONNET_MODEL=slr/balanced ANTHROPIC_DEFAULT_HAIKU_MODEL=slr/fast claude'
 ```
 
-不帶前綴的 `omfm` 會在整個已選池中路由；`omfm/capable`、`omfm/balanced`、`omfm/fast` 則會過濾到對應的模型群組。Claude 風格的別名 `opus`、`sonnet`、`haiku` 也會對應到同樣的群組。你也可以直接傳入 `omfm model` 中選取的具體模型 ID，把請求釘在那個模型上。
+不帶前綴的 `slr` 會在整個已選池中路由；`slr/capable`、`slr/balanced`、`slr/fast` 則會過濾到對應的模型群組。Claude 風格的別名 `opus`、`sonnet`、`haiku` 也會對應到同樣的群組。你也可以直接傳入 `slr model` 中選取的具體模型 ID，把請求釘在那個模型上。
 
 Anthropic 介面也提供本機 `count_tokens` 估算；當請求 fallback 到 OpenAI 相容 provider 路由時，會轉譯常見的 tool-use/tool-result 流程。
 
 ## 保持 context 大小一致
 
-Context overflow 確實可能發生。`omfm` 會把請求原樣轉發給被路由到的模型；它不會壓縮（compact）、摘要或截斷 Agent 已累積的對話。如果一個長工作階段從 1M-token 模型開始，之後又被路由或 failover 到 128k/200k 模型，那麼當 prompt 超過較小模型的 context window 時，上游可能會拒絕請求。用戶端的上下文壓縮可以避免這個問題，但不要假設它一定會自動發生。
+Context overflow 確實可能發生。`slr` 會把請求原樣轉發給被路由到的模型；它不會壓縮（compact）、摘要或截斷 Agent 已累積的對話。如果一個長工作階段從 1M-token 模型開始，之後又被路由或 failover 到 128k/200k 模型，那麼當 prompt 超過較小模型的 context window 時，上游可能會拒絕請求。用戶端的上下文壓縮可以避免這個問題，但不要假設它一定會自動發生。
 
-選擇模型時，請讓每個可路由的模型池維持在同一個 context 長度級距。例如，如果長工作階段使用 `capable`，就只把約 1M-token 模型放進該群組；或者讓 `fast`/`balanced`/`capable` 都保持在 128k/200k 左右。`omfm model` 選擇器會顯示每個模型的 context 大小；未知值會顯示為未知標記，長工作階段應將其視為風險。
+選擇模型時，請讓每個可路由的模型池維持在同一個 context 長度級距。例如，如果長工作階段使用 `capable`，就只把約 1M-token 模型放進該群組；或者讓 `fast`/`balanced`/`capable` 都保持在 128k/200k 左右。`slr model` 選擇器會顯示每個模型的 context 大小；未知值會顯示為未知標記，長工作階段應將其視為風險。
 
 ## 更多
 

@@ -16,10 +16,10 @@ function pad(value: string, width: number): string {
 }
 
 function formatTable(rows: UsageObservation[]): string {
-  if (rows.length === 0) return 'No usage recorded yet.\n';
+  if (rows.length === 0) return '아직 사용 기록이 없어요.\n';
   const modelWidth = Math.min(56, Math.max(5, ...rows.map((row) => row.modelId.length)));
   const lines = [
-    `${pad('Model', modelWidth)} ${pad('Req', 5)} ${pad('OK', 5)} ${pad('Fail', 5)} ${pad('InTok', 8)} ${pad('OutTok', 8)} ${pad('Total', 8)} Last`,
+    `${pad('모델', modelWidth)} ${pad('요청', 5)} ${pad('성공', 5)} ${pad('실패', 5)} ${pad('입력토큰', 8)} ${pad('출력토큰', 8)} ${pad('합계', 8)} 최근`,
     `${'-'.repeat(modelWidth)} ${'-'.repeat(5)} ${'-'.repeat(5)} ${'-'.repeat(5)} ${'-'.repeat(8)} ${'-'.repeat(8)} ${'-'.repeat(8)} ----`,
   ];
   for (const row of rows) {

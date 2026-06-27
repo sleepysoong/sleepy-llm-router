@@ -63,11 +63,11 @@ export async function listNvidiaFreeModels(options: { apiKey: string; fetchImpl?
   const response = await fetchImpl('https://integrate.api.nvidia.com/v1/models', {
     headers: {
       Authorization: `Bearer ${options.apiKey}`,
-      'User-Agent': `oh-my-free-models/${VERSION}`,
+      'User-Agent': `sleepy-llm-router/${VERSION}`,
     },
   });
   if (!response.ok) {
-    throw new Error(`NVIDIA models request failed: ${response.status} ${response.statusText}`);
+    throw new Error(`NVIDIA 모델 요청 실패: ${response.status} ${response.statusText}`);
   }
   const body = (await response.json()) as { data?: NvidiaModel[] } | NvidiaModel[];
   const data = Array.isArray(body) ? body : body.data ?? [];

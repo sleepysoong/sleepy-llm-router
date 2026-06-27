@@ -70,20 +70,20 @@ export function getDoctorStatus(options: { store?: ConfigStore; env?: NodeJS.Pro
 }
 
 function prefixLabel(status: DoctorProviderStatus): string {
-  if (status.source === 'missing') return 'missing';
-  return status.validPrefix === true ? `${status.source}, prefix ok` : `${status.source}, prefix warning`;
+  if (status.source === 'missing') return '없음';
+  return status.validPrefix === true ? `${status.source}, 접두사 확인됨` : `${status.source}, 접두사 경고`;
 }
 
 export function printDoctorStatus(options: { store?: ConfigStore; env?: NodeJS.ProcessEnv; stdout?: OutputLike } = {}): void {
   const stdout = options.stdout ?? process.stdout;
   const status = getDoctorStatus(options);
-  stdout.write('omfm doctor\n');
-  stdout.write(`config: ${status.configPath}\n`);
-  stdout.write(`env file: ${status.envPath} (${status.envFileExists ? 'found' : 'missing'})\n`);
-  stdout.write('provider keys:\n');
+  stdout.write('slr 진단\n');
+  stdout.write(`설정 파일: ${status.configPath}\n`);
+  stdout.write(`환경 파일: ${status.envPath} (${status.envFileExists ? '존재' : '없음'})\n`);
+  stdout.write('프로바이더 키:\n');
   for (const provider of status.providers) {
     stdout.write(`- ${provider.name}: ${prefixLabel(provider)}\n`);
   }
-  stdout.write(`selected models: ${status.selectedModelCount}\n`);
-  stdout.write(`cached models: ${status.cachedModelCount}${status.cacheFetchedAt ? ` (fetched ${status.cacheFetchedAt})` : ''}\n`);
+  stdout.write(`선택된 모델: ${status.selectedModelCount}개\n`);
+  stdout.write(`캐시된 모델: ${status.cachedModelCount}개${status.cacheFetchedAt ? ` (가져온 시간: ${status.cacheFetchedAt})` : ''}\n`);
 }

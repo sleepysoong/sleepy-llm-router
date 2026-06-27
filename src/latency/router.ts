@@ -1,7 +1,7 @@
 import { selectedGroupModelIds } from '../model-groups.js';
 import { ModelGroups } from '../types.js';
 
-const GENERIC_MODELS = new Set(['', 'auto', 'default', 'omfm', 'openrouter/free']);
+const GENERIC_MODELS = new Set(['', 'auto', 'default', 'slr', 'openrouter/free']);
 
 export interface RouteChoice {
   modelId: string;
@@ -10,7 +10,7 @@ export interface RouteChoice {
 
 export function chooseModel(selectedModelIds: string[], requestedModel?: string): RouteChoice {
   if (selectedModelIds.length === 0) {
-    throw new Error('No models selected. Run `omfm model` to choose at least one model.');
+    throw new Error('No models selected. Run `slr model` to choose at least one model.');
   }
   if (requestedModel && !GENERIC_MODELS.has(requestedModel) && selectedModelIds.includes(requestedModel)) {
     return { modelId: requestedModel, reason: 'requested-selected' };

@@ -2,7 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 export function getConfigRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return env.OMFM_HOME || path.join(os.homedir(), '.oh-my-free-models');
+  return env.SLR_HOME || path.join(os.homedir(), '.sleepy-llm-router');
 }
 
 export function getConfigPath(root = getConfigRoot()): string {
@@ -22,5 +22,5 @@ export function getEnvPath(root = getConfigRoot()): string {
 }
 
 export function getLogPath(root = getConfigRoot()): string {
-  return path.join(root, 'omfm.log');
+  return path.join(root, 'slr.log');
 }

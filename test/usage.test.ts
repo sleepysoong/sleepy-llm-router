@@ -9,7 +9,7 @@ const roots: string[] = [];
 afterEach(() => roots.splice(0).forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
 
 function tempStore(): ConfigStore {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-usage-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-usage-'));
   roots.push(root);
   return new ConfigStore(root);
 }
@@ -30,7 +30,7 @@ describe('usage command', () => {
     store.recordUsage('alpha', { success: false });
     const out = output();
     runUsageCommand({ store, stdout: out.stream });
-    expect(out.text()).toContain('Model');
+    expect(out.text()).toContain('모델');
     expect(out.text().indexOf('alpha')).toBeLessThan(out.text().indexOf('beta'));
     expect(out.text()).toContain('3');
   });

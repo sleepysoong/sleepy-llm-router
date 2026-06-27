@@ -10,7 +10,7 @@ afterEach(() => roots.splice(0).forEach((root) => fs.rmSync(root, { recursive: t
 
 describe('status command', () => {
   it('reports primary model from config', () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-status-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-status-'));
     roots.push(root);
     const store = new ConfigStore(root);
     store.updateSelectedModelIds(['model-a:free', 'model-b:free']);
@@ -19,7 +19,7 @@ describe('status command', () => {
   });
 
   it('reports no primary model when empty', () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'omfm-status-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'slr-status-'));
     roots.push(root);
     const store = new ConfigStore(root);
 

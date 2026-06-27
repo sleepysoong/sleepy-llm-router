@@ -69,11 +69,11 @@ async function fetchOpenRouterModels(options: { apiKey: string; fetchImpl: Fetch
   const response = await options.fetchImpl(url, {
     headers: {
       Authorization: `Bearer ${options.apiKey}`,
-      'User-Agent': `oh-my-free-models/${VERSION}`,
+      'User-Agent': `sleepy-llm-router/${VERSION}`,
     },
   });
   if (!response.ok) {
-    throw new Error(`OpenRouter models request failed: ${response.status} ${response.statusText}`);
+    throw new Error(`OpenRouter 모델 요청 실패: ${response.status} ${response.statusText}`);
   }
   const body = (await response.json()) as { data?: OpenRouterModel[] };
   return body.data ?? [];
@@ -109,8 +109,8 @@ export async function postOpenRouterChatCompletion(options: {
     headers: {
       Authorization: `Bearer ${options.apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/hakilee/oh-my-free-models',
-      'X-OpenRouter-Title': 'oh-my-free-models',
+      'HTTP-Referer': 'https://github.com/hakilee/sleepy-llm-router',
+      'X-OpenRouter-Title': 'sleepy-llm-router',
     },
     body: JSON.stringify(options.body),
   });
@@ -130,8 +130,8 @@ export async function postOpenRouterAnthropicMessage(options: {
       Authorization: `Bearer ${options.apiKey}`,
       'Content-Type': 'application/json',
       'anthropic-version': anthropicVersion,
-      'HTTP-Referer': 'https://github.com/hakilee/oh-my-free-models',
-      'X-OpenRouter-Title': 'oh-my-free-models',
+      'HTTP-Referer': 'https://github.com/hakilee/sleepy-llm-router',
+      'X-OpenRouter-Title': 'sleepy-llm-router',
     },
     body: JSON.stringify(options.body),
   });
