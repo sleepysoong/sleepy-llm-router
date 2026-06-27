@@ -41,16 +41,17 @@ When you change provider, latency, or client compatibility behavior, update the 
 
 ## Multilingual user-facing docs
 
-`README.md` stays at the repository root. Localized READMEs and all installation guides live under `docs/`:
+`README.md` stays at the repository root. All documentation is in Korean:
 
-- English: `README.md`, `docs/INSTALLATION.md`
-- 한국어: `docs/README.ko.md`, `docs/INSTALLATION.ko.md`
+- `README.md` — 프로젝트 개요
+- `docs/README.md` — 한국어 README
+- `docs/INSTALLATION.md` — 설치 및 설정
+- `docs/` — 라우팅, 프로바이더, 아키텍처 등 기술 문서
 
-When any of these changes:
+When documentation changes:
 
-1. Update every language version in the same change. Code blocks, commands, env vars, file paths, port numbers, and model IDs must stay byte-identical across languages — only prose is translated. Inline `#` comments inside example shell blocks may be translated to match each language.
-2. The language switcher header at the top of each file lists both languages; the current language is plain text, the others are relative links. Keep this row consistent across files.
-3. `npm run docs:check` validates link integrity for required files; manually confirm cross-language links resolve when adding or removing language mirrors.
+1. Keep all documentation in Korean. Code blocks, commands, env vars, file paths, port numbers, and model IDs must remain as-is — only prose is in Korean.
+2. `npm run docs:check` validates link integrity for required files.
 
 ## Behavioral Principles
 

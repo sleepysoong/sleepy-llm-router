@@ -1,66 +1,64 @@
 # sleepy-llm-router
 
-English | [한국어](./docs/README.ko.md)
+`sleepy-llm-router` (`slr`) 는 코딩 에이전트를 여러 무료 provider 중 설정된 순서대로 라우팅하는 로컬 프록시입니다. OpenAI 또는 Anthropic 호환 에이전트의 baseURL을 `localhost` 로 바꾸고 free 모델 몇 개를 골라두면, rate-limit이나 quota 문제가 생겨도 `slr` 이 요청을 계속 흘려보냅니다.
 
-`sleepy-llm-router` (`slr`) is a local proxy that routes your coding agent to free models across providers. Point your OpenAI- or Anthropic-compatible agent at `localhost`, configure a few free models, and `slr` keeps requests flowing as rate limits and quotas shift underneath.
+## 왜 필요한가
 
-## Why this exists
+Free tier 코딩 에이전트는 스펙 시트에서는 멀쩡해 보이지만, 실제로 돌려보면 몇 가지 문제가 생깁니다.
 
-Free-tier coding agents look great on paper and break in practice. A few things go wrong:
+**Rate limit이 작업 중간에 끊습니다.** OpenRouter나 NVIDIA의 free 모델은 429를 예고 없이 던집니다. 잘 돌던 실행이 도구 호출 한 번에 멈추고, 사람이 직접 다시 시도해야 합니다.
 
-**Rate limits stop your work mid-task.** Free models on OpenRouter or NVIDIA hit 429 unpredictably. A clean run becomes a stalled tool call, and you have to retry by hand.
+**Quota가 마르면 provider를 손으로 갈아끼워야 합니다.** 한 provider의 free quota가 떨어지면 키와 baseURL을 직접 바꿔야 합니다. 에이전트 설정은 그 변화를 스스로 따라잡지 않습니다.
 
-**Quotas force manual provider swapping.** When one provider's free quota runs out, you're manually swapping keys and base URLs. Your agent doesn't adapt.
+**Free 카탈로그가 자주 바뀝니다.** 모델이 새로 생기고, 사라지고, deprecated 표시가 붙고, 조용히 에러를 뱉기 시작합니다.
 
-**The free catalog churns.** Models appear, disappear, get deprecated, or quietly start returning errors.
+## slr이 하는 일
 
-## What slr does about it
+쓸 free 모델의 allowlist를 `slr` 에 넘기면 `http://localhost:4567` 에서 로컬 프록시로 동작합니다. 내부에서는 다음 일을 처리합니다.
 
-You give `slr` an allowlist of free models you actually want to use. It runs as a local proxy on `http://localhost:4567` and handles these jobs internally.
-
-| Job | What happens |
+| 기능 | 처리 방식 |
 | --- | --- |
-| Request routing | Routes requests to models in your configured order. |
-| Client compatibility | Exposes OpenAI-compatible `/v1` and Anthropic-compatible `/anthropic` surfaces, including Anthropic tool-use fallback and local token counting. |
+| 요청 라우팅 | 설정된 모델 순서대로 요청을 라우팅합니다. |
+| 클라이언트 호환성 | OpenAI 호환 `/v1` 과 Anthropic 호환 `/anthropic` surface를 노출하고, Anthropic tool-use fallback과 로컬 token count도 지원합니다. |
 
-Your agent points at `localhost`. Provider switching happens transparently below.
+에이전트는 `localhost` 만 바라봅니다. provider 전환은 그 아래에서 조용히 일어납니다.
 
-## Get API keys
+## API 키 발급
 
-`slr` only forwards traffic. You bring keys from one or both providers.
+`slr`은 트래픽만 전달합니다. 두 provider 중 하나 또는 둘 모두에서 직접 키를 발급받아야 합니다.
 
-**OpenRouter** — sign up at [openrouter.ai](https://openrouter.ai), then issue a key under Keys (prefix `sk-or-`). Free `:free` models cap at 50 requests/day; topping up at least $10 in credits raises the cap to 1,000/day. No credit card needed for the free cap.
+**OpenRouter** — [openrouter.ai](https://openrouter.ai)에서 가입한 뒤 Keys 메뉴에서 키를 발급받습니다(prefix `sk-or-`). `:free` 모델은 하루 50회까지 사용할 수 있고, 크레딧을 $10 이상 충전하면 하루 1,000회로 늘어납니다. 무료 한도에는 신용카드가 필요하지 않습니다.
 
-**NVIDIA** — sign up at [build.nvidia.com](https://build.nvidia.com) (NVIDIA Developer Program), then click "Get API Key" on any model card (prefix `nvapi-`). No credit card needed; rate limits apply per model.
+**NVIDIA** — [build.nvidia.com](https://build.nvidia.com)(NVIDIA Developer Program)에서 가입한 뒤 모델 카드의 "Get API Key" 버튼으로 발급받습니다(prefix `nvapi-`). 신용카드는 필요하지 않으며, rate-limit은 모델별로 적용됩니다.
 
-Add whichever you have to `~/.sleepy-llm-router/.env` — `slr` only uses providers whose key is set.
+가지고 있는 키를 `~/.sleepy-llm-router/.env`에 넣어 두면, `slr`은 키가 설정된 provider만 사용합니다.
 
-## 30-second try-it
+## 30초 만에 시도하기
 
 ```bash
 npm install -g sleepy-llm-router
 mkdir -p ~/.sleepy-llm-router && echo 'OPENROUTER_API_KEY=sk-or-...' > ~/.sleepy-llm-router/.env
-slr start        # serves http://localhost:4567
+slr start        # http://localhost:4567 서빙
 ```
 
-## Common commands
+## 자주 쓰는 명령어
 
-| Command | Use |
+| 명령어 | 용도 |
 | --- | --- |
-| `slr start` | Run the local proxy in the foreground with request/response routing logs. |
-| `slr status` | Show config and selected model status. |
-| `slr doctor` | Inspect config paths, keys, and model cache status. |
-| `slr usage` | Show per-model request and token observations. |
+| `slr start` | 로컬 프록시를 foreground로 실행하고 request/response 라우팅 로그를 출력합니다. |
+| `slr status` | config와 선택된 모델 상태를 확인합니다. |
+| `slr doctor` | config 경로, 키, 모델 캐시 상태를 점검합니다. |
+| `slr usage` | 모델별 요청 수와 token 관측치를 확인합니다. |
 
-## Use it from your agent
+## 에이전트에서 쓰기
 
-OpenAI-compatible clients (OpenCode, Hermes Agent, OpenClaw, etc.):
+OpenAI 호환 클라이언트(OpenCode, Hermes Agent, OpenClaw 등)에서는 다음 값을 사용합니다.
 
 ```text
 baseURL=http://localhost:4567/v1
 ```
 
-Anthropic-compatible clients (Claude Code, etc.):
+Anthropic 호환 클라이언트(Claude Code 등)에서는 다음 환경변수를 설정합니다.
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:4567/anthropic
@@ -68,25 +66,25 @@ export ANTHROPIC_AUTH_TOKEN=slr-local
 export ANTHROPIC_API_KEY=
 ```
 
-For Claude Code, you can create a shell alias that routes Opus, Sonnet, and Haiku requests to `slr` groups:
+Claude Code의 모델 별칭도 `slr` 그룹을 가리키도록 설정할 수 있습니다.
 
 ```bash
 alias freeclaude='ANTHROPIC_BASE_URL=http://localhost:4567/anthropic ANTHROPIC_AUTH_TOKEN=slr-local ANTHROPIC_API_KEY= CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 ANTHROPIC_DEFAULT_OPUS_MODEL=slr/capable ANTHROPIC_DEFAULT_SONNET_MODEL=slr/balanced ANTHROPIC_DEFAULT_HAIKU_MODEL=slr/fast claude'
 ```
 
-The bare `slr` model routes across the entire selected pool, while `slr/capable`, `slr/balanced`, and `slr/fast` filter to the matching model groups. The Claude-style aliases `opus`, `sonnet`, and `haiku` are equivalent to those same groups.
+접두사 없는 `slr`은 선택된 전체 풀로 라우팅되며, `slr/capable`, `slr/balanced`, `slr/fast`는 각 모델 그룹으로 필터링됩니다. Claude 스타일 별칭인 `opus`, `sonnet`, `haiku`도 같은 그룹에 매핑됩니다.
 
-The Anthropic surface also supports local `count_tokens` estimates and translates common tool-use/tool-result flows when a request falls back to an OpenAI-compatible provider route.
+Anthropic surface는 로컬 `count_tokens` 추정치도 제공하며, OpenAI 호환 provider route로 fallback되는 경우 일반적인 tool-use/tool-result 흐름을 번역합니다.
 
-## Keep context sizes consistent
+## 컨텍스트 크기 맞추기
 
-`slr` forwards each request to the routed model. It does not compact, summarize, or truncate the agent's accumulated conversation, so context-window errors are still possible. If a long session starts on a 1M-token model and later routes or fails over to a 128k or 200k model, the smaller model can reject the request once the prompt exceeds its context window.
+`slr`은 요청을 라우팅된 모델로 그대로 전달하며, 에이전트 세션에 누적된 대화를 자동으로 압축(compact)하거나 요약하거나 잘라내지 않습니다. 따라서 컨텍스트 오버플로우는 실제로 발생할 수 있습니다. 긴 세션이 1M 토큰 컨텍스트 모델에서 시작된 뒤 128k/200k 모델로 라우팅되거나 페일오버되면, 프롬프트가 작은 모델의 컨텍스트 윈도를 넘는 순간 업스트림 제공자가 요청을 거절할 수 있습니다.
 
-When selecting models, keep each model group in the same context tier. For example, use only ~1M-token models in `capable` if you run long sessions there, or keep all `fast`, `balanced`, and `capable` groups within the 128k-200k tier. You can check each model's context size with `slr status`.
+모델을 고를 때는 라우팅 후보 풀마다 컨텍스트 크기 티어를 맞춰두세요. `slr status`에서 각 모델의 컨텍스트 크기를 확인할 수 있습니다.
 
-## More
+## 더 알아보기
 
-- Setup, all CLI flags, diagnostics: [INSTALLATION.md](./docs/INSTALLATION.md)
-- Routing internals: [docs/latency-routing.md](./docs/latency-routing.md)
-- Provider catalog: [docs/provider-guide.md](./docs/provider-guide.md)
-- License: [MIT](./LICENSE.md)
+- 설치, 모든 CLI 플래그, 진단은 [설치 및 설정](./docs/INSTALLATION.md)를 참고하세요.
+- 라우팅 내부 동작은 [라우팅](./docs/latency-routing.md)를 참고하세요.
+- Provider 카탈로그는 [프로바이더 가이드](./docs/provider-guide.md)를 참고하세요.
+- 라이선스: [MIT](./LICENSE.md)

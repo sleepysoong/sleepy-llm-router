@@ -1,44 +1,44 @@
-# Documentation Index
+# 문서 인덱스
 
-This directory is the maintained route map for `sleepy-llm-router`. Start here when deciding which files, research notes, and checks apply to a task.
+이 디렉토리는 `sleepy-llm-router`의 유지보수 경로 맵이에요. 어떤 파일, 연구 노트, 검증이 작업에 적용되는지 결정할 때 여기서 시작하세요.
 
-## Repository at a glance
+## 레포 개요
 
-| Question | Answer |
+| 질문 | 답변 |
 | --- | --- |
-| What is this repo? | A TypeScript/Node local proxy named `slr` for routing coding-agent requests to selected free OpenRouter and NVIDIA models. |
-| What does it expose? | OpenAI-compatible `/v1` and Anthropic-compatible `/anthropic` local surfaces on port `4567` by default. |
-| How is it used? | Install globally, set `OPENROUTER_API_KEY` or `NVIDIA_API_KEY`, configure selected models in `~/.sleepy-llm-router/config.json`, then run `slr start`. |
-| Where is runtime behavior? | `src/cli.ts`, `src/commands/*`, `src/server/*`, `src/providers/*`, and `src/latency/*`. |
-| Where are user instructions? | Root `README.md` for overview and `docs/INSTALLATION.md` plus localized mirrors for setup and commands. |
+| 이 레포는 뭔가요? | 선택된 무료 OpenRouter/NVIDIA 모델로 코딩 에이전트 요청을 라우팅하는 `slr`이라는 이름의 TypeScript/Node 로컬 프록시예요. |
+| 뭘 노출하나요? | 기본 포트 `4567`에서 OpenAI 호환 `/v1`과 Anthropic 호환 `/anthropic` 로컬 서피스를 제공해요. |
+| 어떻게 사용하나요? | 전역 설치 후 `OPENROUTER_API_KEY` 또는 `NVIDIA_API_KEY`를 설정하고, `~/.sleepy-llm-router/config.json`에서 선택된 모델을 구성한 다음 `slr start`를 실행하세요. |
+| 런타임 동작은 어디에? | `src/cli.ts`, `src/commands/*`, `src/server/*`, `src/providers/*`, `src/latency/*`에 있어요. |
+| 사용자 설명서는 어디에? | 루트 `README.md`에 개요가, `docs/INSTALLATION.md`와 현지화된 미러에 설정과 명령어가 있어요. |
 
-## Routes
+## 경로
 
-| Task | Read | Research / decisions | Code anchors | Test anchors |
-| --- | --- | --- | --- | --- |
-| Provider support | [Provider guide](provider-guide.md) | [Provider research](../research/providers.md) | `src/providers/*`, `src/server/create-server.ts` | `test/openrouter.test.ts`, `test/nvidia.test.ts`, `test/catalog.test.ts`, provider-related server tests |
-| Routing | [Latency routing](latency-routing.md) | — | `src/latency/router.ts`, `src/server/create-server.ts` | `test/router.test.ts` |
-| Client compatibility | [Client compatibility](client-compatibility.md) | [Client research](../research/client-compatibility.md) | `src/server/*`, `src/server/translate.ts` | `test/server.test.ts`, `test/translate.test.ts` |
-| Product behavior | [Product notes](product.md) | [Research index](../research/index.md) | `src/cli.ts`, `src/commands/*`, `src/server/*` | User-visible command and API tests in `test/` |
-| Architecture boundaries | [Architecture](architecture.md) | [Decision records](../research/decisions/README.md) | `src/config/*`, `src/providers/*`, `src/latency/*`, `src/server/*` | Layer-specific tests |
+| 작업 | 여기서 시작 | 그 다음 확인 |
+| --- | --- | --- |
+| 프로바이더 지원 | [프로바이더 가이드](provider-guide.md) | [프로바이더 연구](../research/providers.md), `src/providers/*`, `src/server/create-server.ts`, `test/openrouter.test.ts`, `test/nvidia.test.ts`, `test/catalog.test.ts` |
+| 라우팅 | [라우팅](latency-routing.md) | `src/latency/router.ts`, `src/server/create-server.ts`, `test/router.test.ts` |
+| 클라이언트 호환성 | [클라이언트 호환성](client-compatibility.md) | [클라이언트 연구](../research/client-compatibility.md), `src/server/*`, `src/server/translate.ts`, `test/server.test.ts`, `test/translate.test.ts` |
+| 제품 동작 | [제품 노트](product.md) | [연구 인덱스](../research/index.md), `src/cli.ts`, `src/commands/*`, `src/server/*` |
+| 아키텍처 경계 | [아키텍처](architecture.md) | [의사결정 기록](../research/decisions/README.md), `src/config/*`, `src/providers/*`, `src/latency/*`, `src/server/*` |
 
-## Maintenance rules
+## 유지보수 규칙
 
-- `README.md` is the root why-focused entry doc; setup and CLI reference live in [INSTALLATION.md](INSTALLATION.md). Localized READMEs and installation guides also live under `docs/`; see `AGENTS.md` § "Multilingual user-facing docs" for update rules.
-- Project-maintenance pages in `docs/` stay compact and route-oriented.
-- `research/` stores reusable findings and decision records that are too detailed for route pages.
-- Keep route/research documentation under `docs/` and `research/` in English. User-facing docs ship five languages.
+- `README.md`는 최상위 why-중심 진입 문서예요. 설정과 CLI 참조는 [INSTALLATION.md](INSTALLATION.md)에 있어요. 현지화된 README와 설치 가이드도 `docs/` 아래에 있어요. 업데이트 규칙은 `AGENTS.md` § "Multilingual user-facing docs"를 참고하세요.
+- `docs/`의 프로젝트 유지보수 페이지는 간결하고 경로 중심으로 유지하세요.
+- `research/`는 경로 페이지에 너무 상세한 재사용 가능한 발견사항과 의사결정 기록을 보관해요.
+- `docs/`와 `research/`의 경로/연구 문서는 영어로 유지하세요. 사용자 대상 문서는 5개 언어로 제공돼요.
 
-## Validation
+## 검증
 
-Run:
+다음을 실행하세요:
 
 ```bash
 npm run docs:check
 ```
 
-Expected coverage: required docs and research files exist, local markdown links resolve, route pages point to their code and test anchors, and maintained docs avoid stale or origin-focused wording.
+예상 커버리지: 필수 문서와 연구 파일이 존재하고, 로컬 마크다운 링크가 해석되고, 경로 페이지가 코드와 테스트 앵커를 가리키고, 유지보수 문서가 오래된 또는 origin 중심 표현을 피하고 있어요.
 
-## Update rule
+## 업데이트 규칙
 
-Update this index whenever a top-level route, source anchor, test anchor, or research note becomes the preferred entry point. Keep entries short and move details to the linked page.
+최상위 경로, 소스 앵커, 테스트 앵커, 또는 연구 노트가 선호되는 진입점이 되면 이 인덱스를 업데이트하세요. 항목은 짧게 유지하고 상세 내용은 연결된 페이지로 이동시키세요.

@@ -1,18 +1,18 @@
-# Latency Routing
+# 라우팅
 
-Use this route for routing logic, candidate ordering, and request fallback behavior.
+라우팅 로직, 후보 순서 지정, 요청 대체 동작에 이 경로를 사용하세요.
 
-## Current routing model
+## 현재 라우팅 모델
 
-- Implementation anchor: [src/latency/router.ts](../src/latency/router.ts).
-- `chooseModel` honors a requested model only when it is in the selected list. Server routing normalizes provider upstream IDs to selected local IDs before calling the router.
-- `chooseGroupedModel` and server retry ordering recognize group names (configurable in `modelGroups`) plus legacy aliases `haiku`/`sonnet`/`opus`. Non-empty groups route and retry only within that configured group; empty groups fall back to the full selected list.
-- Generic or unknown requests (empty string, `auto`, `default`, `slr`, `openrouter/free`) route to the **default group** if configured, otherwise to the first model in the selected list.
-- `orderedCandidates` orders retry candidates by status rank (healthy first, other failures last), then by group order or selected order.
+- 소스 앵커: [src/latency/router.ts](../src/latency/router.ts).
+- `chooseModel`은 요청된 모델이 선택된 목록에 있을 때만 허용해요. 서버 라우팅은 라우터를 호출하기 전에 프로바이더 업스트림 ID를 선택된 로컬 ID로 정규화해요.
+- `chooseGroupedModel`과 서버 재시도 순서는 `modelGroups`에서 구성된 그룹 이름과 레거시 별칭 `haiku`/`sonnet`/`opus`를 인식해요. 비어있지 않은 그룹은 해당 구성된 그룹 내에서만 라우팅과 재시도를 하고, 비어있는 그룹은 전체 선택된 목록으로 대체해요.
+- 일반적이거나 알 수 없는 요청(빈 문자열, `auto`, `default`, `slr`, `openrouter/free`)은 설정된 **기본 그룹**으로 라우팅되고, 없으면 선택된 목록의 첫 번째 모델로 라우팅돼요.
+- `orderedCandidates`는 재시도 후보를 상태 순위(건강한 것 먼저, 기타 실패는 마지막)로 순서 지정하고, 그 다음 그룹 순서 또는 선택된 순서로 지정해요.
 
-## Configurable groups
+## 구성 가능한 그룹
 
-Groups are defined in the config file (`~/.sleepy-llm-router/config.json`) under `modelGroups`:
+그룹은 설정 파일(`~/.sleepy-llm-router/config.json`)의 `modelGroups`에서 정의해요:
 
 ```json
 {
@@ -25,26 +25,26 @@ Groups are defined in the config file (`~/.sleepy-llm-router/config.json`) under
 }
 ```
 
-- Each group has an ordered list of model IDs. The router tries them in order.
-- When a request specifies a group name as the model (e.g. `"model": "coding"`), the router returns models from that group in config order.
-- When a request specifies an unknown model name (not in `selectedModelIds` and not a group name), the router routes to the `defaultGroup` if set.
-- If `defaultGroup` is not set, unknown requests fall back to the first group, then to the full selected list.
-- Legacy aliases `haiku`→`fast`, `sonnet`→`balanced`, `opus`→`capable` are still supported.
-- The `slr/` prefix is stripped before group name matching (e.g. `slr/coding` matches group `coding`).
+- 각 그룹은 모델 ID의 정렬된 목록을 가져요. 라우터는 순서대로 시도해요.
+- 요청이 모델로 그룹 이름을 지정하면(예: `"model": "coding"`), 라우터는 설정 순서대로 그룹의 모델을 반환해요.
+- 요청이 알 수 없는 모델 이름을 지정하면(`selectedModelIds`에 없고 그룹 이름도 아닌 경우), 라우터는 `defaultGroup`이 설정되어 있으면 해당 그룹으로 라우팅해요.
+- `defaultGroup`이 설정되지 않으면 알 수 없는 요청은 첫 번째 그룹으로, 그 다음 전체 선택된 목록으로 대체돼요.
+- 레거시 별칭 `haiku`→`fast`, `sonnet`→`balanced`, `opus`→`capable`는 여전히 지원돼요.
+- `slr/` 접두사는 그룹 이름 매칭 전에 제거돼요 (예: `slr/coding`은 그룹 `coding`과 매칭돼요).
 
-## Required route for routing work
+## 라우팅 작업 필수 경로
 
-1. Start at `AGENTS.md`, then `docs/index.md`, then this file.
-2. Inspect source anchor: `src/latency/router.ts` for routing and candidate selection behavior.
-3. Inspect tests: `test/router.test.ts`.
-4. Define verification before implementation: route-choice determinism, tie-breaking, retry ordering, and group routing.
+1. `AGENTS.md`에서 시작하고, `docs/index.md`, 그리고 이 파일을 읽으세요.
+2. 소스 앵커 `src/latency/router.ts`에서 라우팅과 후보 선택 동작을 확인하세요.
+3. 테스트 `test/router.test.ts`를 확인하세요.
+4. 구현 전에 검증을 정의하세요: 라우팅 선택 결정론, 동점 해소, 재시도 순서, 그룹 라우팅.
 
-## Contract checks
+## 계약 검사
 
-- Selected model order is a fallback contract; do not replace it with nondeterministic iteration.
-- Model group order is also a fallback contract inside each group.
-- Request success may update usage counters; failed provider attempts should not be treated as successful.
+- 선택된 모델 순서는 대체 계약이에요. 비결정론적 반복으로 대체하지 마세요.
+- 모델 그룹 순서도 각 그룹 내 대체 계약이에요.
+- 요청 성공은 사용량 카운터를 업데이트할 수 있지만, 실패한 프로바이더 시도는 성공으로 간주하면 안 돼요.
 
-## Update rule
+## 업데이트 규칙
 
-Update this page when route-choice semantics, candidate ordering, or retry behavior changes.
+라우팅 선택 의미, 후보 순서 지정, 또는 재시도 동작이 변경되면 이 페이지를 업데이트하세요.

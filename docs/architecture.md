@@ -1,30 +1,30 @@
-# Architecture
+# 아키텍처
 
-This package is a local Node.js proxy that lets coding agents point OpenAI-compatible and Anthropic-compatible clients at selected free models. Keep this page as a routing map; product usage remains in [README.md](../README.md), while task-specific routes live in `docs/index.md`.
+이 패키지는 코딩 에이전트가 OpenAI 호환 및 Anthropic 호환 클라이언트를 선택된 무료 모델에 연결할 수 있게 해주는 로컬 Node.js 프록시예요. 이 페이지는 라우팅 맵으로 활용하고, 제품 사용법은 [README.md](../README.md)에, 작업별 경로는 `docs/index.md`에 있어요.
 
-## Runtime shape
+## 런타임 구조
 
-| Area | Source anchors | Responsibility | Verification |
+| 영역 | 소스 앵커 | 책임 | 검증 |
 | --- | --- | --- | --- |
-| CLI entrypoint | [src/cli.ts](../src/cli.ts), `src/commands/*` | Parse `slr` commands for start, status, doctor, and usage. | `test/cli.test.ts`, `test/status.test.ts`, `test/usage.test.ts`, `test/doctor.test.ts` |
-| Config/store | [src/config/store.ts](../src/config/store.ts), [src/config/env.ts](../src/config/env.ts), [src/config/paths.ts](../src/config/paths.ts) | Persist selected model IDs, usage counters, and API-key lookup. | `test/config.test.ts` |
-| Provider adapters | [src/providers/openrouter.ts](../src/providers/openrouter.ts), [src/providers/nvidia.ts](../src/providers/nvidia.ts), [src/providers/catalog.ts](../src/providers/catalog.ts) | List and normalize eligible free models, aggregate them through `listAvailableFreeModels`, preserve provider-specific IDs, and forward provider requests. | `test/openrouter.test.ts`, `test/nvidia.test.ts`, `test/catalog.test.ts` |
-| Latency layer | [src/latency/router.ts](../src/latency/router.ts) | Choose selected models by request match, configurable group match, default group fallback, or deterministic config-order fallback. | `test/router.test.ts` |
-| Local server | [src/server/create-server.ts](../src/server/create-server.ts), [src/server/translate.ts](../src/server/translate.ts), [src/server/sse.ts](../src/server/sse.ts) | Expose `/v1` and `/anthropic` routes, translate fallback payloads, and stream SSE responses. | `test/server.test.ts`, `test/translate.test.ts` |
+| CLI 진입점 | [src/cli.ts](../src/cli.ts), `src/commands/*` | `slr` 명령어(start, status, doctor, usage)를 파싱해요. | `test/cli.test.ts`, `test/status.test.ts`, `test/usage.test.ts`, `test/doctor.test.ts` |
+| 설정/저장소 | [src/config/store.ts](../src/config/store.ts), [src/config/env.ts](../src/config/env.ts), [src/config/paths.ts](../src/config/paths.ts) | 선택된 모델 ID, 사용량 카운터, API 키 조회를 저장해요. | `test/config.test.ts` |
+| 프로바이더 어댑터 | [src/providers/openrouter.ts](../src/providers/openrouter.ts), [src/providers/nvidia.ts](../src/providers/nvidia.ts), [src/providers/catalog.ts](../src/providers/catalog.ts) | 적격 무료 모델을 나열하고 정규화하고, `listAvailableFreeModels`로 집계하고, 프로바이더별 ID를 보존하고, 프로바이더 요청을 전달해요. | `test/openrouter.test.ts`, `test/nvidia.test.ts`, `test/catalog.test.ts` |
+| 라우팅 계층 | [src/latency/router.ts](../src/latency/router.ts) | 요청 매칭, 구성 가능한 그룹 매칭, 기본 그룹 대체, 또는 결정론적 설정 순서 기반으로 선택된 모델을 골라요. | `test/router.test.ts` |
+| 로컬 서버 | [src/server/create-server.ts](../src/server/create-server.ts), [src/server/translate.ts](../src/server/translate.ts), [src/server/sse.ts](../src/server/sse.ts) | `/v1`과 `/anthropic` 경로를 노출하고, 대체 페이로드를 번역하고, SSE 응답을 스트리밍해요. | `test/server.test.ts`, `test/translate.test.ts` |
 
-## Boundary rules
+## 경계 규칙
 
-- Docs-only changes must not alter runtime behavior under `src/` unless the task explicitly asks for implementation.
-- Provider work starts from `docs/provider-guide.md`, then checks `research/providers.md`, `src/providers`, and provider tests.
-- Routing work starts from `docs/latency-routing.md`, then checks `src/latency`, and routing tests.
-- Client compatibility work starts from `docs/client-compatibility.md`, then checks `research/client-compatibility.md`, `src/server`, and protocol tests.
+- 문서 전용 변경은 명시적으로 구현을 요청하지 않는 한 `src/`의 런타임 동작을 변경하면 안 돼요.
+- 프로바이더 작업은 `docs/provider-guide.md`에서 시작하고, `research/providers.md`, `src/providers`, 프로바이더 테스트를 확인해요.
+- 라우팅 작업은 `docs/latency-routing.md`에서 시작하고, `src/latency`, 라우팅 테스트를 확인해요.
+- 클라이언트 호환성 작업은 `docs/client-compatibility.md`에서 시작하고, `research/client-compatibility.md`, `src/server`, 프로토콜 테스트를 확인해요.
 
-## Reliability and security notes
+## 신뢰성 및 보안 참고사항
 
-- API keys come from provider-specific environment variables or `~/.sleepy-llm-router/.env`; do not log secrets in docs, tests, or provider error handling.
-- Routing is local and deterministic: requests route in config-file order, or match a specific model name, or fall into a named group.
-- Free-model filtering is a safety boundary. New provider work must define how free/text-eligible models are identified before exposing them through `/v1/models` or request routing.
+- API 키는 프로바이더별 환경변수 또는 `~/.sleepy-llm-router/.env`에서 읽어요. 문서, 테스트, 프로바이더 오류 처리에서 비밀을 로깅하지 마세요.
+- 라우팅은 로컬이고 결정론적이에요: 요청은 설정 파일 순서대로 라우팅되거나, 특정 모델 이름으로 매칭되거나, 명명된 그룹에 속해요.
+- 무료 모델 필터링은 안전 경계예요. 새 프로바이더 작업은 `/v1/models`이나 요청 라우팅에 노출하기 전에 무료/텍스트 적격 모델이 어떻게 식별되는지 정의해야 해요.
 
-## Update rule
+## 업데이트 규칙
 
-Update this page when a top-level module, protocol boundary, or verification route is added. Keep it compact and link to domain pages instead of duplicating detailed behavior.
+최상위 모듈, 프로토콜 경계, 또는 검증 경로가 추가되면 이 페이지를 업데이트하세요. 상세 내용은 연결된 페이지를 참조하고 중복하지 마세요.
