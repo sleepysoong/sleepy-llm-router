@@ -11,7 +11,7 @@ describe('CLI entrypoint', () => {
   it('prints help', () => {
     const out = execFileSync(process.execPath, ['--import', 'tsx', 'src/cli.ts', '--help'], { encoding: 'utf8' });
     expect(out).toContain('oh-my-free-models');
-    expect(out).toContain('omfm model');
+    expect(out).toContain('omfm start');
   });
 
   it('prints version with --version', () => {

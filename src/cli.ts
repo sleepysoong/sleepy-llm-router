@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { runModelCommand } from './commands/model.js';
 import { runStartCommand } from './commands/start.js';
 import { runStopCommand } from './commands/stop.js';
 import { printStatus } from './commands/status.js';
@@ -37,7 +36,7 @@ function parsePort(value: string | boolean | undefined): number | undefined {
 }
 
 function help(): void {
-  console.log(`oh-my-free-models ${VERSION}\n\nUsage:\n  omfm model [--all] [--select id1,id2] [--group fast|balanced|capable] [--best] [--json] [--no-tui]\n  omfm start [--port 4567] [--daemon]\n  omfm stop\n  omfm status\n  omfm usage [--json]\n  omfm doctor\n  omfm --version\n\nEnvironment:\n  OPENROUTER_API_KEY and NVIDIA_API_KEY are read from the process first, then ~/.oh-my-free-models/.env\n`);
+  console.log(`oh-my-free-models ${VERSION}\n\nUsage:\n  omfm start [--port 4567] [--daemon]\n  omfm stop\n  omfm status\n  omfm usage [--json]\n  omfm doctor\n  omfm --version\n\nEnvironment:\n  OPENROUTER_API_KEY and NVIDIA_API_KEY are read from the process first, then ~/.oh-my-free-models/.env\n`);
 }
 
 async function main(): Promise<void> {
@@ -48,18 +47,6 @@ async function main(): Promise<void> {
   }
   if (parsed.command === 'help' || parsed.command === '--help' || parsed.command === '-h') {
     help();
-    return;
-  }
-  if (parsed.command === 'model') {
-    const selectFlag = parsed.flags.get('select');
-    const groupFlag = parsed.flags.get('group');
-    await runModelCommand({
-      all: parsed.flags.has('all'),
-      json: parsed.flags.has('json'),
-      noTui: parsed.flags.has('no-tui'),
-      group: typeof groupFlag === 'string' ? groupFlag : undefined,
-      select: typeof selectFlag === 'string' ? selectFlag.split(',').map((x) => x.trim()).filter(Boolean) : undefined,
-    });
     return;
   }
   if (parsed.command === 'start') {
