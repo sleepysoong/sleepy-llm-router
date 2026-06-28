@@ -121,9 +121,13 @@ export ANTHROPIC_API_KEY=
 
 ## 7. 라우팅 규칙
 
-- 설정 파일의 `modelGroups` 그룹 순서대로 모델이 라우팅됩니다.
-- 요청에 모델 이름이 명시되어 있으면 `slr` 은 그 모델을 그대로 사용합니다. provider prefix가 붙은 로컬 모델 ID는 매칭되는 upstream 모델 ID도 인식합니다.
-- 그룹 모델명 (`slr/fast`, `slr/balanced`, `slr/capable`, 그리고 `haiku`/`sonnet`/`opus`) 은 해당 그룹에 모델이 있으면 그 그룹 안에서만 라우팅합니다. `defaultGroup`으로 지정된 그룹은 인식할 수 없는 모델 요청에 사용됩니다.
+요청된 모델 이름에 따라 다음 순서로 처리해요:
+
+1. **등록된 그룹 이름** → 해당 그룹의 모델을 순서대로 시도
+2. **모델 ID** (그룹에 포함된 것) → 해당 모델 직접 사용, 실패 시 같은 그룹 fallback
+3. **그 외 전부** → `defaultGroup`으로 라우팅
+
+`slr/` 접두사는 매칭 전에 제거돼요. 레거시 별칭 `haiku`/`sonnet`/`opus`도 지원돼요.
 
 ## 8. 개발
 

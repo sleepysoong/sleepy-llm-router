@@ -10,12 +10,12 @@ describe('config-order router', () => {
 
   it('uses config order for generic request', () => {
     const groups = { default: ['a', 'b'] };
-    expect(chooseModel(groups, 'auto')).toEqual({ modelId: 'a', reason: 'fallback-order' });
+    expect(chooseModel(groups, 'auto')).toEqual({ modelId: 'a', reason: 'model-group' });
   });
 
   it('falls back deterministically when no request', () => {
     const groups = { default: ['z', 'a'] };
-    expect(chooseModel(groups, undefined)).toEqual({ modelId: 'z', reason: 'fallback-order' });
+    expect(chooseModel(groups, undefined)).toEqual({ modelId: 'z', reason: 'model-group' });
   });
 
   it('orders retry candidates by config order', () => {
