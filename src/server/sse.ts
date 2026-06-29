@@ -1,6 +1,10 @@
 import { ServerResponse } from 'node:http';
 import { mapStopReason } from './translate.js';
 
+function numberValue(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : undefined;
+}
+
 export function writeSseHeaders(res: ServerResponse): void {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
@@ -34,23 +38,54 @@ interface OpenAIToolStreamState {
   bufferedArguments: string;
 }
 
-export async function pipeWebStreamToNode(stream: ReadableStream<Uint8Array> | null, res: ServerResponse): Promise<void> {
+export interface StreamUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+}
+
+export async function pipeWebStreamToNode(stream: ReadableStream<Uint8Array> | null, res: ServerResponse): Promise<StreamUsage> {
   res.flushHeaders();
   if (!stream) {
     res.end();
-    return;
+    return {};
   }
+  const decoder = new TextDecoder();
   const reader = stream.getReader();
+  let buffer = '';
+  let usage: StreamUsage = {};
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       res.write(value);
+      // ponytail: 스트림에서 usage 파싱 (stream_options: {include_usage:true} 사용 시 마지막 청크에 포함)
+      buffer += decoder.decode(value, { stream: true });
+      const { frames, rest } = completeSseFrames(buffer);
+      buffer = rest;
+      for (const frame of frames) {
+        for (const line of frame.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (!data || data === '[DONE]' || !data.startsWith('{')) continue;
+          try {
+            const chunk = JSON.parse(data) as { usage?: { prompt_tokens?: number; input_tokens?: number; completion_tokens?: number; output_tokens?: number; total_tokens?: number } };
+            if (chunk.usage) {
+              usage = {
+                inputTokens: numberValue(chunk.usage.prompt_tokens) ?? numberValue(chunk.usage.input_tokens),
+                outputTokens: numberValue(chunk.usage.completion_tokens) ?? numberValue(chunk.usage.output_tokens),
+                totalTokens: numberValue(chunk.usage.total_tokens),
+              };
+            }
+          } catch { /* ignore malformed chunks */ }
+        }
+      }
     }
   } finally {
     res.end();
     reader.releaseLock();
   }
+  return usage;
 }
 
 export async function pipeOpenAIStreamAsAnthropic(stream: ReadableStream<Uint8Array> | null, res: ServerResponse, model: string): Promise<void> {

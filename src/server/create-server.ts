@@ -148,8 +148,10 @@ function missingKeyMessage(model: OmfmModel): string {
   return `${sourceOf(model) === 'nvidia' ? 'NVIDIA_API_KEY' : 'OPENROUTER_API_KEY'} is required for ${model.id}.`;
 }
 
-function withUpstreamModel(body: any, model: OmfmModel): any {
-  return { ...body, model: upstreamId(model) };
+function withUpstreamModel(body: any, model: OmfmModel, stream?: boolean): any {
+  const result = { ...body, model: upstreamId(model) };
+  if (stream) result.stream_options = { include_usage: true };
+  return result;
 }
 
 function requestedModelForRouting(models: OmfmModel[], requestedModel: unknown): string | undefined {
@@ -282,15 +284,17 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             routeReason = 'fallback-order';
           }
           triedAny = true;
-          const upstreamBody = withUpstreamModel(body, model);
+          const upstreamBody = withUpstreamModel(body, model, stream);
           const upstream = sourceOf(model) === 'nvidia'
             ? await postNvidiaChatCompletion({ apiKey, body: upstreamBody, fetchImpl })
             : await postOpenRouterChatCompletion({ apiKey, body: upstreamBody, stream, fetchImpl });
           if (upstream.ok) {
             if (stream) {
-              recordSuccessfulUsage(store, model, upstream.status);
               res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') ?? 'text/event-stream; charset=utf-8' });
-              await pipeWebStreamToNode(upstream.body, res);
+              const streamUsage = await pipeWebStreamToNode(upstream.body, res);
+              lastInputTokens = streamUsage.inputTokens;
+              lastOutputTokens = streamUsage.outputTokens;
+              store.appendUsage({ ts: new Date().toISOString(), model: model.usageId ?? model.id, inputTokens: streamUsage.inputTokens ?? 0, outputTokens: streamUsage.outputTokens ?? 0, success: true });
               return;
             }
             const data = await upstream.json() as Record<string, any>;
@@ -361,7 +365,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             continue;
           }
 
-          const upstreamBody = withUpstreamModel(body, model);
+          const upstreamBody = withUpstreamModel(body, model, stream);
           let upstream = await postOpenRouterAnthropicMessage({ apiKey, body: upstreamBody, fetchImpl });
           if (!upstream.ok && (upstream.status === 404 || upstream.status === 405)) {
             const fallbackBody = anthropicToOpenAI(body, upstreamId(model));
@@ -378,9 +382,11 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
           }
           if (upstream.ok) {
             if (stream) {
-              recordSuccessfulUsage(store, model, upstream.status);
               res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') ?? 'text/event-stream; charset=utf-8' });
-              await pipeWebStreamToNode(upstream.body, res);
+              const streamUsage = await pipeWebStreamToNode(upstream.body, res);
+              lastInputTokens = streamUsage.inputTokens;
+              lastOutputTokens = streamUsage.outputTokens;
+              store.appendUsage({ ts: new Date().toISOString(), model: model.usageId ?? model.id, inputTokens: streamUsage.inputTokens ?? 0, outputTokens: streamUsage.outputTokens ?? 0, success: true });
               return;
             }
             const data = await upstream.json() as Record<string, any>;
