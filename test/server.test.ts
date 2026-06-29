@@ -101,8 +101,8 @@ describe('local proxy server', () => {
       expect(logs[0]).toMatchObject({ type: 'request', method: 'POST', path: '/v1/chat/completions' });
       expect(responseLog).toMatchObject({ type: 'response', statusCode: 200, requestedModel: 'auto', modelId: 'model-a:free', routeReason: 'fallback-order' });
       expect(formatServerLogEvent(responseLog!)).toContain('requested=auto model=model-a:free route=fallback-order');
-      expect(formatServerLogEvent(logs[0]!, { color: true })).toContain('\u001b[36mrequest\u001b[0m');
-      expect(formatServerLogEvent(responseLog!, { color: true })).toContain('\u001b[32mresponse\u001b[0m');
+      expect(formatServerLogEvent(logs[0]!, { color: true })).toContain('[request]');
+      expect(formatServerLogEvent(responseLog!, { color: true })).toContain('[response]');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

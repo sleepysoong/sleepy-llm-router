@@ -46,14 +46,10 @@ function statusColorCode(statusCode: number): number {
 }
 
 export function formatServerLogEvent(event: ServerLogEvent, options: FormatServerLogEventOptions = {}): string {
-  if (event.type === 'request') return `[slr] #${event.id} ${color('request', 36, options.color)} ${event.method} ${safeLogValue(event.path)}`;
+  if (event.type === 'request') return `#${event.id} | [request] [${event.method}] ${safeLogValue(event.path)}`;
   const statusColor = statusColorCode(event.statusCode);
   const details = [
-    `[slr] #${event.id} ${color('response', statusColor, options.color)}`,
-    color(String(event.statusCode), statusColor, options.color),
-    `${event.durationMs}ms`,
-    event.method,
-    safeLogValue(event.path),
+    `#${event.id} | [response] [${color(String(event.statusCode), statusColor, options.color)}] ${event.durationMs}ms [${event.method}] ${safeLogValue(event.path)}`,
   ];
   if (event.requestedModel) details.push(`requested=${safeLogValue(event.requestedModel)}`);
   if (event.modelId) details.push(`model=${safeLogValue(event.modelId)}`);
