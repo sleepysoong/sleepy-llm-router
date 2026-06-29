@@ -48,14 +48,15 @@ function openrouterUsageId(id: string): string {
 }
 
 export function normalizeOpenRouterModel(model: OpenRouterModel, popularityRank?: number, metadataCatalog?: ProviderMetadataCatalog): OmfmModel {
-  const id = model.id ?? model.canonical_slug ?? 'unknown';
-  const metadata = modelMetadata('openrouter', id, metadataCatalog);
+  const rawId = model.id ?? model.canonical_slug ?? 'unknown';
+  const metadata = modelMetadata('openrouter', rawId, metadataCatalog);
   return {
-    id,
-    name: model.name ?? id,
-    provider: inferProvider(id),
+    id: `openrouter/${rawId}`,
+    upstreamId: rawId,
+    name: model.name ?? rawId,
+    provider: inferProvider(rawId),
     source: 'openrouter',
-    usageId: openrouterUsageId(id),
+    usageId: openrouterUsageId(rawId),
     contextLength: model.context_length ?? metadata?.contextLength,
     popularityRank,
     supportedParameters: model.supported_parameters ?? [],

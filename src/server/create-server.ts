@@ -46,10 +46,11 @@ function statusColorCode(statusCode: number): number {
 }
 
 export function formatServerLogEvent(event: ServerLogEvent, options: FormatServerLogEventOptions = {}): string {
-  if (event.type === 'request') return `#${event.id} | [request] [${event.method}] ${safeLogValue(event.path)}`;
+  const c = options.color;
+  if (event.type === 'request') return `#${event.id} | ${color('request', 36, c)} [${color(event.method, 35, c)}] ${safeLogValue(event.path)}`;
   const statusColor = statusColorCode(event.statusCode);
   const details = [
-    `#${event.id} | [response] [${color(String(event.statusCode), statusColor, options.color)}] ${event.durationMs}ms [${event.method}] ${safeLogValue(event.path)}`,
+    `#${event.id} | ${color('response', statusColor, c)} [${color(String(event.statusCode), statusColor, c)}] ${color(`${event.durationMs}ms`, 90, c)} [${color(event.method, 35, c)}] ${safeLogValue(event.path)}`,
   ];
   if (event.requestedModel) details.push(`requested=${safeLogValue(event.requestedModel)}`);
   if (event.modelId) details.push(`model=${safeLogValue(event.modelId)}`);
@@ -365,6 +366,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
           let upstream = await postOpenRouterAnthropicMessage({ apiKey, body: upstreamBody, fetchImpl });
           if (!upstream.ok && (upstream.status === 404 || upstream.status === 405)) {
             const fallbackBody = anthropicToOpenAI(body, upstreamId(model));
+            if (stream) fallbackBody.stream_options = { include_usage: true };
             upstream = await postOpenRouterChatCompletion({ apiKey, body: fallbackBody, stream, fetchImpl });
             if (upstream.ok) {
               await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => {

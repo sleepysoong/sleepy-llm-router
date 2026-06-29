@@ -17,6 +17,8 @@ describe('OpenRouter model filtering', () => {
 
   it('normalizes provider display label', () => {
     const model = normalizeOpenRouterModel({ id: 'google/gemini:free', name: 'Gemini Free' });
+    expect(model.id).toBe('openrouter/google/gemini:free');
+    expect(model.upstreamId).toBe('google/gemini:free');
     expect(model.provider).toBe('google');
     expect(inferProvider('openai/gpt')).toBe('openai');
   });
@@ -44,9 +46,9 @@ describe('OpenRouter model filtering', () => {
     const models = await listOpenRouterFreeModels({ apiKey: 'key', fetchImpl });
 
     expect(models.map((model) => model.id)).toEqual([
-      'zeta/popular:free',
-      'alpha/also-popular:free',
-      'alpha/fallback:free',
+      'openrouter/zeta/popular:free',
+      'openrouter/alpha/also-popular:free',
+      'openrouter/alpha/fallback:free',
     ]);
     expect(models.map((model) => model.popularityRank)).toEqual([0, 1, 2]);
   });
