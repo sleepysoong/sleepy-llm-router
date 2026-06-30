@@ -60,7 +60,7 @@ describe('Anthropic/OpenAI translation fallback', () => {
   });
 
   it('rejects unsupported non-text blocks', () => {
-    expect(() => extractTextContent([{ type: 'image', source: {} }])).toThrow(/Unsupported/);
+    expect(() => extractTextContent([{ type: 'image', source: {} }])).toThrow(/지원하지 않는/);
   });
 
   it('maps OpenAI completion into Anthropic message shape', () => {

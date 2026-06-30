@@ -37,7 +37,7 @@ export function extractTextContent(content: unknown): string {
         return String((block as { text?: unknown }).text ?? '');
       }
       const type = block && typeof block === 'object' ? String((block as { type?: unknown }).type ?? 'unknown') : 'unknown';
-      throw new Error(`Unsupported Anthropic content block: ${type}`);
+      throw new Error(`지원하지 않는 Anthropic 콘텐츠 블록이에요: ${type}`);
     })
     .filter(Boolean)
     .join('\n');
