@@ -67,7 +67,7 @@ export async function listNvidiaFreeModels(options: { apiKey: string; fetchImpl?
     },
   });
   if (!response.ok) {
-    throw new Error(`NVIDIA 모델 요청 실패: ${response.status} ${response.statusText}`);
+    throw new Error(`NVIDIA 모델 목록 요청 실패: ${response.status} ${response.statusText} (GET /v1/models)`);
   }
   const body = (await response.json()) as { data?: NvidiaModel[] } | NvidiaModel[];
   const data = Array.isArray(body) ? body : body.data ?? [];

@@ -30,9 +30,11 @@ function ensureDir(filePath: string): void {
 function readJson<T>(filePath: string, fallback: T): T {
   if (!fs.existsSync(filePath)) return fallback;
   try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+    const content = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(content) as T;
   } catch (error) {
-    throw new Error(`${filePath} 파싱에 실패했어요: ${error instanceof Error ? error.message : String(error)}`);
+    const size = fs.statSync(filePath).size;
+    throw new Error(`${filePath} 파싱에 실패했어요 (${size}B): ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

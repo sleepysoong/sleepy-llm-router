@@ -19,7 +19,7 @@ function candidateIds(modelGroups: ModelGroups, requestedModel?: string, default
 
 export function chooseModel(modelGroups: ModelGroups, requestedModel?: string): RouteChoice {
   const ids = candidateIds(modelGroups, requestedModel);
-  if (ids.length === 0) throw new Error('선택된 모델이 없어요. config.json에서 모델을 하나 이상 선택하세요.');
+  if (ids.length === 0) throw new Error(`선택된 모델이 없어요. config.json의 modelGroups에 모델을 하나 이상 추가하세요. (요청: ${requestedModel ?? '없음'}, 사용 가능한 그룹: ${Object.keys(modelGroups).join(', ') || '없음'})`);
   const normalized = normalizeModelGroupName(requestedModel);
   const reason = normalized && modelGroups[normalized] ? 'model-group' : 'fallback-order';
   return { modelId: ids[0]!, reason };
@@ -27,7 +27,7 @@ export function chooseModel(modelGroups: ModelGroups, requestedModel?: string): 
 
 export function chooseGroupedModel(modelGroups: ModelGroups, requestedModel?: string, defaultGroup?: string): RouteChoice {
   const ids = candidateIds(modelGroups, requestedModel, defaultGroup);
-  if (ids.length === 0) throw new Error('선택된 모델이 없어요. config.json에서 모델을 하나 이상 선택하세요.');
+  if (ids.length === 0) throw new Error(`선택된 모델이 없어요. config.json의 modelGroups에 모델을 하나 이상 추가하세요. (요청: ${requestedModel ?? '없음'}, 기본그룹: ${defaultGroup ?? '없음'}, 사용 가능한 그룹: ${Object.keys(modelGroups).join(', ') || '없음'})`);
   const normalized = normalizeModelGroupName(requestedModel);
   const reason = normalized && modelGroups[normalized] ? 'model-group' : 'fallback-order';
   return { modelId: ids[0]!, reason };

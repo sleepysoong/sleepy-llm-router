@@ -2,6 +2,8 @@ import { ConfigStore } from '../config/store.js';
 import { createOmfmServer, formatServerLogEvent, listen } from '../server/create-server.js';
 import { allGroupModelIds } from '../model-groups.js';
 import { requireAnyProviderApiKey } from '../config/env.js';
+import { VERSION } from '../version.js';
+import { getConfigPath, getEnvPath } from '../config/paths.js';
 import Table from 'cli-table3';
 
 export async function runStartCommand(options: { port?: number; store?: ConfigStore } = {}): Promise<void> {
@@ -11,7 +13,17 @@ export async function runStartCommand(options: { port?: number; store?: ConfigSt
   const port = options.port ?? config.port;
   if (config.port !== port) store.writeConfig({ ...config, port });
 
-  const apiKeys = requireAnyProviderApiKey(process.env, store.paths.root);
+  const env = process.env;
+  const hasNvidiaKey = Boolean(env.NVIDIA_API_KEY?.trim());
+  const hasOpenRouterKey = Boolean(env.OPENROUTER_API_KEY?.trim());
+
+  console.log(`\nslr v${VERSION}`);
+  console.log(`  config: ${getConfigPath(store.paths.root)}`);
+  console.log(`  env: ${getEnvPath(store.paths.root)}`);
+  console.log(`  NVIDIA_API_KEY: ${hasNvidiaKey ? '✓' : '✗'}`);
+  console.log(`  OPENROUTER_API_KEY: ${hasOpenRouterKey ? '✓' : '✗'}`);
+
+  const apiKeys = requireAnyProviderApiKey(env, store.paths.root);
 
   const invalidModels: string[] = [];
   for (const [group, models] of Object.entries(config.modelGroups)) {

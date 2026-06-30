@@ -47,7 +47,13 @@ export function resolveProviderApiKeys(env: NodeJS.ProcessEnv = process.env, roo
 export function requireAnyProviderApiKey(env: NodeJS.ProcessEnv = process.env, root = getConfigRoot(env)): ProviderApiKeys {
   const keys = resolveProviderApiKeys(env, root);
   if (!keys.openrouter && !keys.nvidia) {
-    throw new Error(`OPENROUTER_API_KEY 또는 NVIDIA_API_KEY가 필요해요. 전역 환경변수에 설정하거나 ${getEnvPath(root)}에 추가하세요.`);
+    throw new Error(
+      `API 키가 설정되지 않았어요.\n` +
+      `  NVIDIA_API_KEY 또는 OPENROUTER_API_KEY 중 하나 이상이 필요해요.\n` +
+      `  설정 방법:\n` +
+      `    1. 환경변수: export NVIDIA_API_KEY=nvapi-...\n` +
+      `    2. .env 파일: echo "NVIDIA_API_KEY=nvapi-..." > ${getEnvPath(root)}`
+    );
   }
   return keys;
 }

@@ -433,7 +433,7 @@ describe('local proxy server', () => {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [] }) });
       expect(res.status).toBe(400);
-      expect(await res.text()).toContain('slr model');
+      expect(await res.text()).toContain('modelGroups');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

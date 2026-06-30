@@ -50,7 +50,9 @@ export async function listAvailableFreeModels(options: { apiKeys: ProviderApiKey
     tasks.push(listNvidiaFreeModels({ apiKey: options.apiKeys.nvidia, fetchImpl: options.fetchImpl }));
   }
 
+  const start = Date.now();
   const settled = await Promise.allSettled(tasks);
+  const elapsed = Date.now() - start;
   const models: OmfmModel[] = [];
   const errors: string[] = [];
   for (const [index, result] of settled.entries()) {
@@ -69,11 +71,13 @@ export async function loadModelCatalog(options: { apiKeys: ProviderApiKeys; fetc
   const cachedModels = cache ? modelsForConfiguredProviders(cache.models, options.apiKeys) : [];
   if (cache && isModelCacheFresh(cache) && cachedModels.length > 0) return { models: cachedModels, source: 'fresh', errors: [] };
 
+  const start = Date.now();
   const result = await listAvailableFreeModels({ apiKeys: options.apiKeys, fetchImpl: options.fetchImpl });
+  const elapsed = Date.now() - start;
   if (result.models.length > 0) {
     options.store.writeModelCache({ models: result.models, fetchedAt: new Date().toISOString() });
     return { models: result.models, source: 'fetched', errors: result.errors };
   }
   if (cache && cachedModels.length > 0) return { models: cachedModels, source: 'stale', errors: result.errors };
-  throw new Error(result.errors.length > 0 ? `모든 프로바이더 모델 가져오기 실패: ${result.errors.join('; ')}` : '사용 가능한 프로바이더 모델이 없어요.');
+  throw new Error(result.errors.length > 0 ? `모든 프로바이더 모델 가져오기 실패 (${elapsed}ms): ${result.errors.join('; ')}` : '사용 가능한 프로바이더 모델이 없어요.');
 }

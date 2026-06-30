@@ -74,7 +74,7 @@ async function fetchOpenRouterModels(options: { apiKey: string; fetchImpl: Fetch
     },
   });
   if (!response.ok) {
-    throw new Error(`OpenRouter 모델 요청 실패: ${response.status} ${response.statusText}`);
+    throw new Error(`OpenRouter 모델 목록 요청 실패: ${response.status} ${response.statusText} (GET /api/v1/models${options.category ? `?category=${options.category}` : ''})`);
   }
   const body = (await response.json()) as { data?: OpenRouterModel[] };
   return body.data ?? [];

@@ -24,7 +24,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 
 export type ServerLogEvent =
   | { type: 'request'; id: number; method: string; path: string }
-  | { type: 'response'; id: number; method: string; path: string; statusCode: number; durationMs: number; requestedModel?: string; modelId?: string; routeReason?: RouteChoice['reason'] | 'failover'; stream?: boolean; inputTokens?: number; outputTokens?: number; error?: string };
+  | { type: 'response'; id: number; method: string; path: string; statusCode: number; durationMs: number; requestedModel?: string; modelId?: string; routeReason?: RouteChoice['reason'] | 'failover'; stream?: boolean; inputTokens?: number; outputTokens?: number; error?: string; group?: string; triedCount?: number; candidateCount?: number };
 
 interface FormatServerLogEventOptions {
   color?: boolean;
@@ -55,6 +55,9 @@ export function formatServerLogEvent(event: ServerLogEvent, options: FormatServe
   if (event.requestedModel) details.push(`requested=${safeLogValue(event.requestedModel)}`);
   if (event.modelId) details.push(`model=${safeLogValue(event.modelId)}`);
   if (event.routeReason) details.push(`route=${event.routeReason}`);
+  if (event.group) details.push(`group=${event.group}`);
+  if (typeof event.candidateCount === 'number') details.push(`candidates=${event.candidateCount}`);
+  if (typeof event.triedCount === 'number') details.push(`tried=${event.triedCount}`);
   if (typeof event.inputTokens === 'number') details.push(`in=${event.inputTokens}`);
   if (typeof event.outputTokens === 'number') details.push(`out=${event.outputTokens}`);
   if (event.stream) details.push('stream=true');
@@ -137,12 +140,13 @@ async function selectedModelSelection(store: ConfigStore, apiKeys: ProviderApiKe
 
 function assertSelectedFree(models: OmfmModel[]): void {
   if (models.length === 0) {
-    throw Object.assign(new Error('선택된 무료 모델이 없어요. `slr model`에서 사용할 무료 모델을 하나 이상 선택하세요.'), { statusCode: 400 });
+    throw Object.assign(new Error('선택된 무료 모델이 없어요. config.json의 modelGroups에 사용할 모델을 하나 이상 추가하세요. (예: "nvidia/z-ai/glm-5.1")'), { statusCode: 400 });
   }
 }
 
 function missingKeyMessage(model: OmfmModel): string {
-  return `${sourceOf(model) === 'nvidia' ? 'NVIDIA_API_KEY' : 'OPENROUTER_API_KEY'} is required for ${model.id}.`;
+  const keyName = sourceOf(model) === 'nvidia' ? 'NVIDIA_API_KEY' : 'OPENROUTER_API_KEY';
+  return `${keyName}가 없어서 ${model.id}을(를) 사용할 수 없어요. 환경변수 또는 .env 파일에 키를 추가하세요.`;
 }
 
 function withUpstreamModel(body: any, model: OmfmModel, stream?: boolean): any {
@@ -159,7 +163,7 @@ function requestedModelForRouting(models: OmfmModel[], requestedModel: unknown):
 }
 
 function noUsableModelResponse(res: ServerResponse, lastError: unknown): void {
-  json(res, 400, { error: { message: '설정된 프로바이더 API 키로 사용 가능한 선택된 무료 모델이 없어요.', details: String(lastError ?? '') } });
+  json(res, 400, { error: { message: '설정된 API 키로 사용 가능한 무료 모델이 없어요. API 키 설정과 모델 ID를 확인하세요.', details: String(lastError ?? '') } });
 }
 
 function numberValue(value: unknown): number | undefined {
@@ -214,6 +218,9 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
     let lastInputTokens: number | undefined;
     let lastOutputTokens: number | undefined;
     let lastError: string | undefined;
+    let logGroup: string | undefined;
+    let logCandidateCount: number | undefined;
+    let logTriedCount: number | undefined;
     try {
       const method = req.method ?? 'GET';
       const url = new URL(req.url ?? '/', 'http://localhost');
@@ -234,6 +241,9 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             inputTokens: lastInputTokens,
             outputTokens: lastOutputTokens,
             error: lastError,
+            group: logGroup,
+            candidateCount: logCandidateCount,
+            triedCount: logTriedCount,
           });
         });
       }
@@ -265,8 +275,11 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         assertSelectedFree(selected.models);
         const routingModel = requestedModelForRouting(selected.models, body.model);
         const candidateIds = orderedCandidates(selected.modelGroups, routingModel, selected.defaultGroup);
+        logGroup = selected.defaultGroup;
+        logCandidateCount = candidateIds.length;
         let upstreamError: unknown;
         let triedAny = false;
+        let triedCount = 0;
         for (const modelId of candidateIds) {
           const model = selected.byId.get(modelId);
           if (!model) continue;
@@ -281,6 +294,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             routeReason = 'fallback-order';
           }
           triedAny = true;
+          triedCount += 1;
           const upstreamBody = withUpstreamModel(body, model, stream);
           const upstream = sourceOf(model) === 'nvidia'
             ? await postNvidiaChatCompletion({ apiKey, body: upstreamBody, fetchImpl })
@@ -292,6 +306,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
               lastInputTokens = streamUsage.inputTokens;
               lastOutputTokens = streamUsage.outputTokens;
               store.appendUsage({ ts: new Date().toISOString(), model: model.usageId ?? model.id, inputTokens: streamUsage.inputTokens ?? 0, outputTokens: streamUsage.outputTokens ?? 0, success: true });
+              logTriedCount = triedCount;
               return;
             }
             const data = await upstream.json() as Record<string, any>;
@@ -306,6 +321,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             lastInputTokens = usage.inputTokens;
             lastOutputTokens = usage.outputTokens;
             recordSuccessfulUsage(store, model, upstream.status, data);
+            logTriedCount = triedCount;
             json(res, upstream.status, data);
             return;
           }
@@ -329,8 +345,11 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         assertSelectedFree(selected.models);
         const routingModel = requestedModelForRouting(selected.models, body.model);
         const candidateIds = orderedCandidates(selected.modelGroups, routingModel, selected.defaultGroup);
+        logGroup = selected.defaultGroup;
+        logCandidateCount = candidateIds.length;
         let upstreamError: unknown;
         let triedAny = false;
+        let triedCount = 0;
         for (const modelId of candidateIds) {
           const model = selected.byId.get(modelId);
           if (!model) continue;
@@ -345,10 +364,12 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             routeReason = 'fallback-order';
           }
           triedAny = true;
+          triedCount += 1;
           if (sourceOf(model) === 'nvidia') {
             const fallbackBody = anthropicToOpenAI(body, upstreamId(model));
             const upstream = await postNvidiaChatCompletion({ apiKey, body: fallbackBody, fetchImpl });
             if (upstream.ok) {
+              logTriedCount = triedCount;
               await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => {
                 const usage = usageFromResponse(data);
                 lastInputTokens = usage.inputTokens;
@@ -369,6 +390,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             if (stream) fallbackBody.stream_options = { include_usage: true };
             upstream = await postOpenRouterChatCompletion({ apiKey, body: fallbackBody, stream, fetchImpl });
             if (upstream.ok) {
+              logTriedCount = triedCount;
               await writeOpenAIAsAnthropic(upstream, res, body, modelId, (data) => {
                 const usage = usageFromResponse(data);
                 lastInputTokens = usage.inputTokens;
@@ -385,6 +407,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
               lastInputTokens = streamUsage.inputTokens;
               lastOutputTokens = streamUsage.outputTokens;
               store.appendUsage({ ts: new Date().toISOString(), model: model.usageId ?? model.id, inputTokens: streamUsage.inputTokens ?? 0, outputTokens: streamUsage.outputTokens ?? 0, success: true });
+              logTriedCount = triedCount;
               return;
             }
             const data = await upstream.json() as Record<string, any>;
@@ -400,6 +423,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             lastInputTokens = usage.inputTokens;
             lastOutputTokens = usage.outputTokens;
             recordSuccessfulUsage(store, model, upstream.status, data);
+            logTriedCount = triedCount;
             json(res, upstream.status, data);
             return;
           }
@@ -414,7 +438,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         return;
       }
 
-      json(res, 404, { error: { message: `Unsupported endpoint: ${method} ${url.pathname}` } });
+      json(res, 404, { error: { message: `지원하지 않는 엔드포인트예요: ${method} ${url.pathname}. 사용 가능한 엔드포인트: GET /health, GET /v1/models, POST /v1/chat/completions, POST /anthropic/v1/messages` } });
     } catch (error) {
       const statusCode = typeof (error as { statusCode?: unknown }).statusCode === 'number' ? (error as { statusCode: number }).statusCode : 500;
       json(res, statusCode, { error: { message: error instanceof Error ? error.message : String(error) } });
