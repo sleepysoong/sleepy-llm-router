@@ -27,7 +27,7 @@ function parsePort(value: string | boolean | undefined): number | undefined {
   if (value === undefined || value === false) return undefined;
   const port = Number(value);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    throw new Error(`잘못된 --port 값: ${String(value)}`);
+    throw new Error(`잘못된 --port 값: ${String(value)} (0~65535 사이의 숫자를 입력하세요)`);
   }
   return port;
 }

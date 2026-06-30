@@ -6,9 +6,10 @@ import { postNvidiaChatCompletion } from '../providers/nvidia.js';
 import { isFreeOpenRouterModel, postOpenRouterAnthropicMessage, postOpenRouterChatCompletion } from '../providers/openrouter.js';
 import { FetchLike, ModelGroups, ModelSource, OmfmModel, ProviderApiKeys, sourceOf } from '../types.js';
 import { orderedCandidates, RouteChoice } from '../latency/router.js';
-import { allGroupModelIds } from '../model-groups.js';
+import { allGroupModelIds, normalizeModelGroupName } from '../model-groups.js';
 import { anthropicToOpenAI, openAIToAnthropic } from './translate.js';
 import { pipeOpenAIStreamAsAnthropic, pipeWebStreamToNode } from './sse.js';
+import { VERSION } from '../version.js';
 
 export interface ServerOptions {
   store?: ConfigStore;
@@ -82,7 +83,11 @@ async function readBody(req: IncomingMessage): Promise<any> {
   for await (const chunk of req) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   const text = Buffer.concat(chunks).toString('utf8');
   if (!text) return {};
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw Object.assign(new Error(`요청 본문을 파싱할 수 없어요. 유효한 JSON을 보내주세요. (${text.length}바이트 수신)`), { statusCode: 400 });
+  }
 }
 
 function upstreamId(model: OmfmModel): string {
@@ -98,6 +103,14 @@ function isCachedFreeModel(model: OmfmModel): boolean {
 async function availableFreeModels(store: ConfigStore, apiKeys: ProviderApiKeys, fetchImpl?: FetchLike) {
   const catalog = await loadModelCatalog({ apiKeys, fetchImpl, store });
   return catalog.models.filter(isCachedFreeModel);
+}
+
+// ponytail: modelId로 소속 그룹 역추적
+function findGroupForModel(modelGroups: ModelGroups, modelId: string): string | undefined {
+  for (const [group, ids] of Object.entries(modelGroups)) {
+    if (ids.includes(modelId)) return group;
+  }
+  return undefined;
 }
 
 interface SelectedModelsResult {
@@ -187,7 +200,7 @@ function recordSuccessfulUsage(store: ConfigStore, model: OmfmModel, httpStatus:
 async function recordUpstreamFailure(store: ConfigStore, model: OmfmModel, upstream: Response): Promise<string> {
   const text = await upstream.text();
   store.appendUsage({ ts: new Date().toISOString(), model: model.usageId ?? model.id, inputTokens: 0, outputTokens: 0, success: false });
-  return text;
+  return `[${upstream.status}] ${text}`;
 }
 
 async function writeOpenAIAsAnthropic(upstream: Response, res: ServerResponse, body: any, modelId: string, onData?: (data?: Record<string, any>) => void): Promise<void> {
@@ -248,7 +261,7 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         });
       }
       if (method === 'GET' && url.pathname === '/health') {
-        json(res, 200, { ok: true, service: 'sleepy-llm-router' });
+        json(res, 200, { ok: true, service: 'sleepy-llm-router', version: VERSION, uptime: Math.floor(process.uptime()) });
         return;
       }
 
@@ -275,7 +288,8 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         assertSelectedFree(selected.models);
         const routingModel = requestedModelForRouting(selected.models, body.model);
         const candidateIds = orderedCandidates(selected.modelGroups, routingModel, selected.defaultGroup);
-        logGroup = selected.defaultGroup;
+        const normalized = normalizeModelGroupName(routingModel);
+        logGroup = normalized && selected.modelGroups[normalized] ? normalized : selected.defaultGroup;
         logCandidateCount = candidateIds.length;
         let upstreamError: unknown;
         let triedAny = false;
@@ -312,8 +326,8 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             const data = await upstream.json() as Record<string, any>;
             // ponytail: 빈 choices는 실패로 간주하고 다음 모델 시도
             if (!Array.isArray(data.choices) || data.choices.length === 0) {
-              upstreamError = 'empty choices';
-              lastError = `[${modelId}] empty choices`;
+              upstreamError = '.choices가 비어있어요';
+              lastError = `[${modelId}] choices가 비어있어요`;
               recordSuccessfulUsage(store, model, upstream.status);
               continue;
             }
@@ -345,7 +359,8 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
         assertSelectedFree(selected.models);
         const routingModel = requestedModelForRouting(selected.models, body.model);
         const candidateIds = orderedCandidates(selected.modelGroups, routingModel, selected.defaultGroup);
-        logGroup = selected.defaultGroup;
+        const normalized = normalizeModelGroupName(routingModel);
+        logGroup = normalized && selected.modelGroups[normalized] ? normalized : selected.defaultGroup;
         logCandidateCount = candidateIds.length;
         let upstreamError: unknown;
         let triedAny = false;
@@ -414,8 +429,8 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
             // ponytail: 빈 choices/content는 실패로 간주
             const empty = !Array.isArray(data.choices) && !Array.isArray(data.content);
             if (empty) {
-              upstreamError = 'empty response';
-              lastError = `[${modelId}] empty response`;
+              upstreamError = 'choices와 content가 모두 비어있어요';
+              lastError = `[${modelId}] choices와 content가 모두 비어있어요`;
               recordSuccessfulUsage(store, model, upstream.status);
               continue;
             }
@@ -441,7 +456,10 @@ export function createOmfmServer(options: ServerOptions = {}): http.Server {
       json(res, 404, { error: { message: `지원하지 않는 엔드포인트예요: ${method} ${url.pathname}. 사용 가능한 엔드포인트: GET /health, GET /v1/models, POST /v1/chat/completions, POST /anthropic/v1/messages` } });
     } catch (error) {
       const statusCode = typeof (error as { statusCode?: unknown }).statusCode === 'number' ? (error as { statusCode: number }).statusCode : 500;
-      json(res, statusCode, { error: { message: error instanceof Error ? error.message : String(error) } });
+      const method = req.method ?? 'GET';
+      const path = req.url ?? '/';
+      const msg = error instanceof Error ? error.message : String(error);
+      json(res, statusCode, { error: { message: `${msg}`, request: `${method} ${path}` } });
     }
   });
 }

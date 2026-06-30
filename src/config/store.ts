@@ -101,13 +101,17 @@ export class ConfigStore {
     if (!text) return [];
     const lines = text.split('\n');
     const result: UsageLogEntry[] = [];
+    let skipped = 0;
     for (const line of lines) {
       if (!line) continue;
       try {
         result.push(JSON.parse(line) as UsageLogEntry);
       } catch {
-        // skip malformed
+        skipped += 1;
       }
+    }
+    if (skipped > 0) {
+      console.error(`[slr] 경고: 사용 기록 파일에서 ${skipped}줄이 손상되어 건너뛰었어요.`);
     }
     return result;
   }

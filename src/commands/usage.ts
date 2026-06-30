@@ -52,7 +52,8 @@ export function runUsageCommand(options: RunUsageCommandOptions = {}): void {
   const logs = filterLogs(store.readUsageLogs(), options.date, options.week);
 
   if (logs.length === 0) {
-    console.log('아직 사용 기록이 없어요.');
+    const filterDesc = options.date ? `날짜: ${options.date}` : options.week ? `주차: ${options.week}주차` : '';
+    console.log(`사용 기록이 없어요${filterDesc ? ` (${filterDesc})` : ''}.`);
     return;
   }
 
@@ -64,6 +65,11 @@ export function runUsageCommand(options: RunUsageCommandOptions = {}): void {
     style: { head: ['cyan'] },
   });
 
+  let totalRequests = 0;
+  let totalFailed = 0;
+  let totalInput = 0;
+  let totalOutput = 0;
+
   for (const row of rows) {
     table.push([
       row.model,
@@ -72,7 +78,18 @@ export function runUsageCommand(options: RunUsageCommandOptions = {}): void {
       String(row.inputTokens),
       String(row.outputTokens),
     ]);
+    totalRequests += row.requests;
+    totalFailed += row.failed;
+    totalInput += row.inputTokens;
+    totalOutput += row.outputTokens;
   }
 
+  table.push([
+    { colSpan: 1, content: '', hAlign: 'left' as const },
+    { colSpan: 4, content: `총 ${totalRequests}건 요청, ${totalFailed}건 실패, in=${totalInput} out=${totalOutput}`, hAlign: 'right' as const },
+  ]);
+
+  const filterDesc = options.date ? `날짜: ${options.date}` : options.week ? `주차: ${options.week}주차` : '전체';
+  console.log(`사용량 (${filterDesc})`);
   console.log(table.toString());
 }
