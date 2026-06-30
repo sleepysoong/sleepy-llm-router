@@ -25,7 +25,7 @@ function json(res: ServerResponse, status: number, body: unknown): void {
 
 export type ServerLogEvent =
   | { type: 'request'; id: number; method: string; path: string }
-  | { type: 'response'; id: number; method: string; path: string; statusCode: number; durationMs: number; requestedModel?: string; modelId?: string; routeReason?: RouteChoice['reason'] | 'failover'; stream?: boolean; inputTokens?: number; outputTokens?: number; error?: string; group?: string; triedCount?: number; candidateCount?: number };
+  | { type: 'response'; id: number; method: string; path: string; statusCode: number; durationMs: number; requestedModel?: string; modelId?: string; routeReason?: RouteChoice['reason']; stream?: boolean; inputTokens?: number; outputTokens?: number; error?: string; group?: string; triedCount?: number; candidateCount?: number };
 
 interface FormatServerLogEventOptions {
   color?: boolean;
